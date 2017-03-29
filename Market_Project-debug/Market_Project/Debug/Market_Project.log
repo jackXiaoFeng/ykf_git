@@ -1,4 +1,0 @@
-﻿  main.cpp
-C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(1193,5): warning MSB8030: The linker switch "Minimum Required Version" requires "SubSystem" to be set.  Without "SubSystem", the "Minimum Required Version" would not be passed to linker and could prevent to the output binary from running on older Operating Systems.
-  Market_Project.vcxproj -> G:\Market_green\行情最终版\Market_Project-debug\Debug\Market_Project.exe
-  Market_Project.vcxproj -> G:\Market_green\行情最终版\Market_Project-debug\Debug\Market_Project.pdb (Full PDB)
