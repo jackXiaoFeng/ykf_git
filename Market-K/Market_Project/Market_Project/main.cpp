@@ -570,7 +570,7 @@ public:
 		}
 		else
 		{
-			printf("休盘时间\n");
+			//printf("休盘时间\n");
 			//return;
 		}
 
