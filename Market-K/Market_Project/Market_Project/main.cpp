@@ -571,7 +571,7 @@ public:
 		else
 		{
 			//printf("休盘时间\n");
-			//return;
+			return;
 		}
 
 		//合约标示去除多余字符 并转成大写字符
