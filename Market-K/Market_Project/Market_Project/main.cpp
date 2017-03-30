@@ -1,5 +1,5 @@
 #pragma once
-// mddemo.cpp : 
+// main.cpp : 
 //一个简单的例子，介绍QdpFtdcMduserApi和QdpFtdcMduserSpi接口的使用。
 
 #include <stdio.h>
@@ -12,21 +12,38 @@
 #include <time.h>
 #include <ctype.h>
 
-
 #include <hiredis.h>
 #include <ocilib.h>
 #include "cJSON.h"
 
 #define NO_QFORKIMPL //这一行必须加才能正常使用
 
-
 #pragma comment(lib,"hiredis.lib")
-
 #pragma comment(lib,"ociliba.lib")
 #pragma comment(lib,"ocilibm.lib")
 #pragma comment(lib,"ocilibw.lib")
-
 using namespace std;
+
+//#define environment 1  //d 开发环境
+//#define environment 2  //t 测试环境
+//#define environment 3  //  正式环境
+
+#define environment 1
+#define MarketIP "tcp://101.226.241.234:30007"
+
+#if environment == 1
+#define redisDomainName  "redisd.onehgold.com"
+#define oracleDomainName "dbd1.onehgold.com"
+
+#elif environment == 2
+#define redisDomainName  "redist.onehgold.com"
+#define oracleDomainName "dbt1.onehgold.com"
+
+#else
+#define redisDomainName  "redis.onehgold.com"
+#define oracleDomainName "db1.onehgold.com"
+
+#endif ;
 
 //k线间隔
 
@@ -47,7 +64,7 @@ int	nowTimestamp_Surplus;
 //连接redis
 void ConnrectionRedis()
 {
-	char ip[] = "redisd.onehgold.com";
+	char ip[] = redisDomainName;
 	int port = 6379;
 	// 连接Redis
 	rc = redisConnect(ip, port);
@@ -72,7 +89,10 @@ void ConnrectionOracle()
 {
 	//bool bConn = dbOper.ConnToDB("Provider = OraOLEDB.Oracle.1; User ID = test; Password = Abcd1234; Data Source = (DESCRIPTION = (ADDRESS = (PROTOCOL = TCP)(HOST = 222.73.85.6)(PORT = 15212))(CONNECT_DATA = (SERVICE_NAME = ORCL))); Persist Security Info = False", "HQ", "Abcd1234");
 
-	bool bConn = dbOper.ConnToDB("Provider = OraOLEDB.Oracle.1; User ID = test; Password = Abcd1234; Data Source = (DESCRIPTION = (ADDRESS = (PROTOCOL = TCP)(HOST = dbd1.onehgold.com)(PORT = 1521))(CONNECT_DATA = (SERVICE_NAME = ORCL))); Persist Security Info = False", "HQ", "Abcd1234");
+	char str[500];
+	sprintf_s(str, "Provider = OraOLEDB.Oracle.1; User ID = test; Password = Abcd1234; Data Source = (DESCRIPTION = (ADDRESS = (PROTOCOL = TCP)(HOST = %s)(PORT = 1521))(CONNECT_DATA = (SERVICE_NAME = ORCL))); Persist Security Info = False", oracleDomainName);
+	bool bConn = dbOper.ConnToDB(str, "HQ", "Abcd1234");
+
 	if (false == bConn)
 	{
 		printf("连接数据库出现错误\n");
@@ -148,7 +168,7 @@ void stamp_to_standard(int stampTime, char a[100], char week[100])
 	strcpy(week, w);
 }
 
-int compare_time_60(int time,int time_interval_local,char marketDate[100])
+int compare_time_60(int time, int time_interval_local, char marketDate[100])
 {
 	int endTime_60;
 	char s[100];
@@ -236,7 +256,7 @@ int compare_time_240(char marketDate[100])
 	{
 		endTime_240 = nowTimestamp_Zero + 86400;
 	}
-	
+
 	return endTime_240;
 }
 
@@ -309,7 +329,7 @@ void del_char(char str[], char d[])
 char * replaceAll(char * src, char oldChar, char newChar) {
 	char * head = src;
 	while (*src != '\0') {
-		if (*src == oldChar) 
+		if (*src == oldChar)
 			*src = newChar;
 		src++;
 	}
@@ -506,7 +526,7 @@ public:
 
 		//输出行情
 		//printf_Market(pMarketData);
-		
+
 		//暂定只存储4个品种K线
 		if (!(strcmp(pMarketData->InstrumentID, "Ag(T+D)") == 0 ||
 			strcmp(pMarketData->InstrumentID, "Au(T+D)") == 0 ||
@@ -520,8 +540,8 @@ public:
 			//printf("pMarketData->InstrumentID=%s\n\n", pMarketData->InstrumentID);
 		}
 
-		
-		
+
+
 		//行情更新时间为  本地日期年月日 拼接行情时分秒
 		char nowtDate[100] = "";
 		char marketDate[100] = "";
@@ -563,8 +583,8 @@ public:
 		nowTimestamp_Surplus = (int(dds) + 28800) % int(86400);
 
 		if ((nowTimestamp_Surplus > 72000 || nowTimestamp_Surplus < 9000) ||
-			(nowTimestamp_Surplus >32400 &   nowTimestamp_Surplus < 41400) ||
-			(nowTimestamp_Surplus >48600 &   nowTimestamp_Surplus < 55800))
+			(nowTimestamp_Surplus >32400 & nowTimestamp_Surplus < 41400) ||
+			(nowTimestamp_Surplus >48600 & nowTimestamp_Surplus < 55800))
 		{
 			//printf("开盘时间");
 		}
@@ -582,7 +602,7 @@ public:
 		delAndReplace(origin_InstrumentID, d, '.', '_');
 		strcpy(InstrumentID, origin_InstrumentID);
 
-		printf("行情%s更新拼接时间：%s=时间戳===%d==\n",InstrumentID, time_hms, market_Updatetimes);
+		printf("K线种类：%s拼接时间：%s时间戳：%d==\n", InstrumentID, time_hms, market_Updatetimes);
 
 		//定义并赋值，存储redis行情信息
 		double maxl = pMarketData->HighestPrice;
@@ -608,7 +628,7 @@ public:
 		nameArray[8] = "f1_week";
 		nameArray[9] = "f1_month";
 
-		int time_interval_local_array[10] = { 
+		int time_interval_local_array[10] = {
 			60,
 			5 * 60,
 			15 * 60,
@@ -616,9 +636,9 @@ public:
 			60 * 60,
 			240 * 60,
 			60,
-			24*60*60,
-			7* 24 * 60 * 60,
-			32 * 24 * 60 * 60 
+			24 * 60 * 60,
+			7 * 24 * 60 * 60,
+			32 * 24 * 60 * 60
 		};
 
 
@@ -654,7 +674,7 @@ public:
 			if (i == 4)
 			{
 				//60分钟 K
-				endTime = compare_time_60(market_Updatetimes, time_interval_local_array[i],marketDate);
+				endTime = compare_time_60(market_Updatetimes, time_interval_local_array[i], marketDate);
 			}
 			else if (i == 5)
 			{
@@ -742,8 +762,8 @@ public:
 
 					double sum_el;
 					int v_changeNum;
-						
-					if (!(i== fenshi_i))
+
+					if (!(i == fenshi_i))
 					{
 						current_maxl = cJSON_GetObjectItem(root, "maxl")->valuedouble;
 						current_minl = cJSON_GetObjectItem(root, "minl")->valuedouble;
@@ -765,7 +785,7 @@ public:
 					bool isMonth = false;
 					if (i == 10)
 					{
-						
+
 						lt = time_t(max_time);
 						ptr = localtime(&lt);
 						int max_Month = ptr->tm_mon + 1;
@@ -773,7 +793,7 @@ public:
 						lt = time_t(endTime);
 						ptr = localtime(&lt);
 						int end_Month = ptr->tm_mon + 1;
-						
+
 						if (max_Month != end_Month)
 						{
 							isMonth = true;
@@ -788,7 +808,7 @@ public:
 						//printf("大于时间间隔内的手数: %d==总手数%d\n", v, now_time_v);
 						if (i == fenshi_i)
 						{
-							sprintf(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%lf}", el, now_time_v, endTime,el);
+							sprintf(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%lf}", el, now_time_v, endTime, el);
 						}
 						else
 						{
@@ -802,7 +822,7 @@ public:
 						//更新v
 						if (i == fenshi_i)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d,\"sum_el\":%lf,\"v_changeNum\":%d}", el, now_time_v, v - now_time_v, endTime,el,1);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d,\"sum_el\":%lf,\"v_changeNum\":%d}", el, now_time_v, v - now_time_v, endTime, el, 1);
 						}
 						else
 						{
@@ -878,7 +898,7 @@ public:
 						//记录值默认 都是LastPrice v 和 interval_v 默认总成交量 endTime默认行情去秒数时间
 						if (i == fenshi_i)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d,\"sum_el\":%lf,\"v_changeNum\":%d}", el, v, v, endTime, el,1);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d,\"sum_el\":%lf,\"v_changeNum\":%d}", el, v, v, endTime, el, 1);
 						}
 						else
 						{
@@ -898,7 +918,7 @@ public:
 			}
 		}
 
-		//detail
+		//明细
 		char detailName[30] = "fenshi_1_minutes_detail";
 
 		char detail_myhash[50];
@@ -908,7 +928,7 @@ public:
 		//printf("=========HKEYS: %d\n", reply->elements);
 
 		if (reply &&  reply->elements>0) {
-			
+
 			int max_time;
 			int min_time;
 
@@ -969,10 +989,10 @@ public:
 				reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", detail_myhash, dds, value);
 				//printf("插入实时%d---%s\n", dds, reply->str);
 				freeReplyObject(reply);
-				
+
 			}
-		    }
-		    else {
+		}
+		else {
 			printf("redisCommand [lrange mylist 0 -1] error:%d. %s\n", reply->type, reply->str);
 			if (reply->str == NULL)
 			{
@@ -986,7 +1006,7 @@ public:
 				freeReplyObject(reply);
 			}
 		}
-			//printf("--\n\n\n");
+		//printf("--\n\n\n");
 
 	}
 
@@ -1061,7 +1081,7 @@ int main()
 	lt = time(NULL);
 	//lt = time_t(1487959830);
 	ptr = localtime(&lt);
-	
+
 
 	printf("second:%d\n", ptr->tm_sec);
 	printf("minute:%d\n", ptr->tm_min);
@@ -1081,19 +1101,19 @@ int main()
 	/*time_t now;
 	int nowTime = (int)time(&now);
 	nowTime = 1489687830;*/
-	
+
 	/*
 	//周一
 	int MomdayTime = nowTime - nowDayOfWeek * 24 * 60 * 60;
 
-	//周五 
+	//周五
 	int SaturdayTime = MomdayTime + 4 * 24 * 60 * 60;
 
 	char week[20] = "";
 	strftime(week, sizeof(week), "%A", ptr);
 	if (strcmp(week, "Saturday") == 0)
 	{
-		SaturdayTime = SaturdayTime + 7 * 24 * 60 * 60;
+	SaturdayTime = SaturdayTime + 7 * 24 * 60 * 60;
 	}
 
 	//strftime(s, sizeof(s), "%H:%M", &tm);
@@ -1118,7 +1138,7 @@ int main()
 
 	if (max_Month != end_Month)
 	{
-		printf("---end_time_month=%d--max_time_month=%d--\n", end_Month, max_Month);
+	printf("---end_time_month=%d--max_time_month=%d--\n", end_Month, max_Month);
 	}
 
 	char nowtTime[100] = "2014-02-14 20:47:00";
@@ -1130,7 +1150,7 @@ int main()
 
 	ConnrectionRedis();
 
-	
+
 	// 产生一个CQdpFtdcMduserApi实例
 	CQdpFtdcMduserApi *pUserApi = CQdpFtdcMduserApi::CreateFtdcMduserApi();
 	// 产生一个事件处理的实例
@@ -1143,7 +1163,7 @@ int main()
 	///        TERT_QUICK:先传送当前行情快照,再传送登录后市场行情的内容	//pUserApi-> SubscribeMarketDataTopic (101, TERT_RESUME);
 	//pUserApi-> SubscribeMarketDataTopic (110, QDP_TERT_RESTART);
 	// 设置行情发布服务器的地址
-	pUserApi->RegisterFront("tcp://101.226.241.234:30007");
+	pUserApi->RegisterFront(MarketIP);
 	//pUserApi->RegisterFront("tcp://hqsource.onehgold.com:30007");
 
 	// 使客户端开始与行情发布服务器建立连接
