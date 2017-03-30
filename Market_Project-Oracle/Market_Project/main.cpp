@@ -1,5 +1,5 @@
 #pragma once
-// mddemo.cpp : 
+// main.cpp : 
 //一个简单的例子，介绍QdpFtdcMduserApi和QdpFtdcMduserSpi接口的使用。
 
 #include <stdio.h>
@@ -12,21 +12,38 @@
 #include <time.h>
 #include <ctype.h>
 
-
 #include <hiredis.h>
 #include <ocilib.h>
 #include "cJSON.h"
 
 #define NO_QFORKIMPL //这一行必须加才能正常使用
 
-
 #pragma comment(lib,"hiredis.lib")
-
 #pragma comment(lib,"ociliba.lib")
 #pragma comment(lib,"ocilibm.lib")
 #pragma comment(lib,"ocilibw.lib")
-
 using namespace std;
+
+//#define environment 1  //d 开发环境
+//#define environment 2  //t 测试环境
+//#define environment 3  //  正式环境
+
+#define environment 1
+
+#if environment == 1
+#define redisDomainName  "redisd.onehgold.com"
+#define oracleDomainName "dbd1.onehgold.com"
+
+#elif environment == 2
+#define redisDomainName  "redist.onehgold.com"
+#define oracleDomainName "dbt1.onehgold.com"
+
+#else
+#define redisDomainName  "redis.onehgold.com"
+#define oracleDomainName "db1.onehgold.com"
+
+#endif 
+
 
 //k线间隔
 
@@ -45,7 +62,7 @@ char   dateTime[100];
 //连接redis
 void ConnrectionRedis()
 {
-	char ip[] = "redisd.onehgold.com";
+	char ip[] = redisDomainName;
 	int port = 6379;
 	// 连接Redis
 	rc = redisConnect(ip, port);
@@ -70,7 +87,9 @@ void ConnrectionOracle()
 {
 	//bool bConn = dbOper.ConnToDB("Provider = OraOLEDB.Oracle.1; User ID = test; Password = Abcd1234; Data Source = (DESCRIPTION = (ADDRESS = (PROTOCOL = TCP)(HOST = 222.73.85.6)(PORT = 15212))(CONNECT_DATA = (SERVICE_NAME = ORCL))); Persist Security Info = False", "HQ", "Abcd1234");
 
-	bool bConn = dbOper.ConnToDB("Provider = OraOLEDB.Oracle.1; User ID = test; Password = Abcd1234; Data Source = (DESCRIPTION = (ADDRESS = (PROTOCOL = TCP)(HOST = dbd1.onehgold.com)(PORT = 1521))(CONNECT_DATA = (SERVICE_NAME = ORCL))); Persist Security Info = False", "HQ", "Abcd1234");
+	char str[500];
+	sprintf_s(str, "Provider = OraOLEDB.Oracle.1; User ID = test; Password = Abcd1234; Data Source = (DESCRIPTION = (ADDRESS = (PROTOCOL = TCP)(HOST = %s)(PORT = 1521))(CONNECT_DATA = (SERVICE_NAME = ORCL))); Persist Security Info = False", oracleDomainName);
+	bool bConn = dbOper.ConnToDB(str, "HQ", "Abcd1234");
 	if (false == bConn)
 	{
 		printf("连接数据库出现错误\n");
@@ -252,7 +271,7 @@ void del_char(char str[], char d[])
 char * replaceAll(char * src, char oldChar, char newChar) {
 	char * head = src;
 	while (*src != '\0') {
-		if (*src == oldChar) 
+		if (*src == oldChar)
 			*src = newChar;
 		src++;
 	}
@@ -448,8 +467,8 @@ public:
 	{
 
 		//输出行情
-		printf_Market(pMarketData);
-		
+		//printf_Market(pMarketData);
+
 		_RecordsetPtr pRst;
 		char sql[1500] = { 0 };
 
@@ -481,8 +500,7 @@ public:
 		delAndReplace(origin_InstrumentID, d, '.', '_');
 		strcpy(InstrumentID, origin_InstrumentID);
 
-		printf("行情%s更新拼接时间：%s=时间戳===%d==\n", InstrumentID, time_hms, market_Updatetimes);
-
+		printf("oracle行情%s拼接时间：%s--时间戳：%d=\n", InstrumentID, time_hms, market_Updatetimes);
 
 		//oracle时间戳类型 格式要遵循 yyyy - mm - dd hh : 24mi : ss.ff
 
@@ -557,7 +575,7 @@ public:
 		pRst = dbOper.ExecuteWithResSQL(sql);
 		if (NULL != pRst)
 		{
-			printf("更新行情种类-%s---成功\n", pMarketData->InstrumentID);
+			//printf("更新行情种类-%s---成功\n", pMarketData->InstrumentID);
 		}
 		else
 		{
@@ -636,7 +654,7 @@ public:
 		pRst = dbOper.ExecuteWithResSQL(sql);
 		if (NULL != pRst)
 		{
-			printf("插入历史数据--%s-成功\n", pMarketData->InstrumentID);
+			//printf("插入历史数据--%s-成功\n", pMarketData->InstrumentID);
 		}
 		else
 		{
@@ -652,8 +670,8 @@ public:
 			char value[2000] = "";
 
 			sprintf(value, "{\"TradingDay\":\"%s\",\"SettlementGroupID\":\"%s\",\"SettlementID\":%d,\"InstrumentID\":\"%s\",\"UpdateTime\":\"%s\",\"UpdateMillisec\":%d,\"ExchangeID\":\"%s\",\"PreSettlementPrice\":%lf,\"PreClosePrice\":%lf,\"PreOpenInterest\":%lf,\"PreDelta\":%lf,\"OpenPrice\":%lf,\"HighestPrice\":%lf,\"LowestPrice\":%lf,\"ClosePrice\":%lf,\"UpperLimitPrice\":%lf,\"LowerLimitPrice\":%lf,\"SettlementPrice\":%lf,\"CurrDelta\":%lf,\"LastPrice\":%lf,\"Volume\":%d,\"Turnover\":%lf,\"OpenInterest\":%lf,\"BidPrice1\":%lf,\"BidVolume1\":%d,\"AskPrice1\":%lf,\"AskVolume1\":%d,\"BidPrice2\":%lf,\"BidVolume2\":%d,\"AskPrice2\":%lf,\"AskVolume2\":%d,\"BidPrice3\":%lf,\"BidVolume3\":%d,\"AskPrice3\":%lf,\"AskVolume3\":%d,\"BidPrice4\":%lf,\"BidVolume4\":%d,\"AskPrice4\":%lf,\"AskVolume4\":%d,\"BidPrice5\":%lf,\"BidVolume5\":%d,\"AskPrice5\":%lf,\"AskVolume5\":%d}",
-				pMarketData->TradingDay, 
-				pMarketData->SettlementGroupID, 
+				pMarketData->TradingDay,
+				pMarketData->SettlementGroupID,
 				pMarketData->SettlementID,
 
 				pMarketData->InstrumentID,
@@ -665,7 +683,7 @@ public:
 				pMarketData->PreSettlementPrice,
 				pMarketData->PreClosePrice,
 				pMarketData->PreOpenInterest,
-				pMarketData->PreDelta, 
+				pMarketData->PreDelta,
 
 				//今
 				pMarketData->OpenPrice,
@@ -717,13 +735,13 @@ public:
 			);
 
 			reply = (redisReply *)redisCommand(rc, "HMSET ALL_InstrumentID %s %s", InstrumentID, value);
-			printf("哈希表插入信息：HMSET: %s\n\n", reply->str);
+			//printf("哈希表插入信息：HMSET: %s\n\n", reply->str);
 			freeReplyObject(reply);
 		}
 		else
 		{
 			printf("品种：==%s==暂无行情数据，不能插入redis\n\n\n", InstrumentID);
-		}	
+		}
 
 	}
 
@@ -799,7 +817,7 @@ int main()
 	lt = time(NULL);
 	//lt = time_t(1487959830);
 	ptr = localtime(&lt);
-	
+
 
 	printf("second:%d\n", ptr->tm_sec);
 	printf("minute:%d\n", ptr->tm_min);
@@ -819,19 +837,19 @@ int main()
 	/*time_t now;
 	int nowTime = (int)time(&now);
 	nowTime = 1489687830;*/
-	
+
 	/*
 	//周一
 	int MomdayTime = nowTime - nowDayOfWeek * 24 * 60 * 60;
 
-	//周五 
+	//周五
 	int SaturdayTime = MomdayTime + 4 * 24 * 60 * 60;
 
 	char week[20] = "";
 	strftime(week, sizeof(week), "%A", ptr);
 	if (strcmp(week, "Saturday") == 0)
 	{
-		SaturdayTime = SaturdayTime + 7 * 24 * 60 * 60;
+	SaturdayTime = SaturdayTime + 7 * 24 * 60 * 60;
 	}
 
 	//strftime(s, sizeof(s), "%H:%M", &tm);
@@ -856,20 +874,19 @@ int main()
 
 	if (max_Month != end_Month)
 	{
-		printf("---end_time_month=%d--max_time_month=%d--\n", end_Month, max_Month);
+	printf("---end_time_month=%d--max_time_month=%d--\n", end_Month, max_Month);
 	}
 
 	char nowtTime[100] = "2014-02-14 20:47:00";
 	int a =  StringToDatetime(nowtTime);
 	*/
 
-	//创建新git分支 newDeveloper
 
 	ConnrectionOracle();
 
 	ConnrectionRedis();
 
-	
+
 	// 产生一个CQdpFtdcMduserApi实例
 	CQdpFtdcMduserApi *pUserApi = CQdpFtdcMduserApi::CreateFtdcMduserApi();
 	// 产生一个事件处理的实例
