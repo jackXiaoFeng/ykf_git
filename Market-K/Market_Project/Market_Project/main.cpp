@@ -16,6 +16,8 @@
 #include <ocilib.h>
 #include "cJSON.h"
 
+#include "Config.h"
+
 #define NO_QFORKIMPL //这一行必须加才能正常使用
 
 #pragma comment(lib,"hiredis.lib")
@@ -28,22 +30,26 @@ using namespace std;
 //#define environment 2  //t 测试环境
 //#define environment 3  //  正式环境
 
-#define environment 1
-#define MarketIP "tcp://101.226.241.234:30007"
+//#define environment 1  //d 开发环境
+//#define environment 2  //t 测试环境
+//#define environment 3  //  正式环境
 
-#if environment == 1
-#define redisDomainName  "redisd.onehgold.com"
-#define oracleDomainName "dbd1.onehgold.com"
+//#define environment 3
+//#define MarketIP "tcp://101.226.241.234:30007"
 
-#elif environment == 2
-#define redisDomainName  "redist.onehgold.com"
-#define oracleDomainName "dbt1.onehgold.com"
-
-#else
-#define redisDomainName  "redis.onehgold.com"
-#define oracleDomainName "db1.onehgold.com"
-
-#endif ;
+//#if environment == 1
+//#define redisDomainName  "redisd.onehgold.com"
+//#define oracleDomainName "dbd1.onehgold.com"
+//
+//#elif environment == 2
+//#define redisDomainName  "redist.onehgold.com"
+//#define oracleDomainName "dbt1.onehgold.com"
+//
+//#else
+//#define redisDomainName  "redis.onehgold.com"
+//#define oracleDomainName "db1.onehgold.com"
+//
+//#endif 
 
 //k线间隔
 
@@ -64,13 +70,23 @@ int	nowTimestamp_Surplus;
 int week_v = 0;
 int month_v = 0;
 
+//market tcp
+char marketAddress[40];
+//oracle
+char oracle_DomainName[40];
+int  oracle_Port;
+char oracle_UserID[20];
+char oracle_Password[20];
+
+//redis
+char redis_DomainName[40];
+int  redis_Port;
+
 //连接redis
 void ConnrectionRedis()
 {
-	char ip[] = redisDomainName;
-	int port = 6379;
 	// 连接Redis
-	rc = redisConnect(ip, port);
+	rc = redisConnect(redis_DomainName, redis_Port);
 	if (rc == NULL || rc->err) {
 		if (rc) {
 			printf("Connection error: %s\n", rc->errstr);
@@ -79,7 +95,12 @@ void ConnrectionRedis()
 		else {
 			printf("Connection error: can't allocate redis context\n");
 		}
-		exit(1);
+		//exit(1);
+		//return;
+	}
+	else
+	{
+		printf("连接redis成功!\n");
 	}
 	//freeReplyObject(reply);
 
@@ -90,20 +111,18 @@ void ConnrectionRedis()
 //连接Oracle
 void ConnrectionOracle()
 {
-	//bool bConn = dbOper.ConnToDB("Provider = OraOLEDB.Oracle.1; User ID = test; Password = Abcd1234; Data Source = (DESCRIPTION = (ADDRESS = (PROTOCOL = TCP)(HOST = 222.73.85.6)(PORT = 15212))(CONNECT_DATA = (SERVICE_NAME = ORCL))); Persist Security Info = False", "HQ", "Abcd1234");
-
 	char str[500];
-	sprintf_s(str, "Provider = OraOLEDB.Oracle.1; User ID = test; Password = Abcd1234; Data Source = (DESCRIPTION = (ADDRESS = (PROTOCOL = TCP)(HOST = %s)(PORT = 1521))(CONNECT_DATA = (SERVICE_NAME = ORCL))); Persist Security Info = False", oracleDomainName);
-	bool bConn = dbOper.ConnToDB(str, "HQ", "Abcd1234");
-
+	sprintf_s(str, "Provider = OraOLEDB.Oracle.1; User ID = %s; Password = %s; Data Source = (DESCRIPTION = (ADDRESS = (PROTOCOL = TCP)(HOST = %s)(PORT = %d))(CONNECT_DATA = (SERVICE_NAME = ORCL))); Persist Security Info = False", oracle_UserID, oracle_Password, oracle_DomainName, oracle_Port);
+	bool bConn = dbOper.ConnToDB(str, oracle_UserID, oracle_Password);
 	if (false == bConn)
 	{
 		printf("连接数据库出现错误\n");
-		system("PAUSE");
-		return;
+		//system("PAUSE");
+		//return;
 	}
-	printf("连接数据库成功!\n");
+	printf("连接oracle成功!\n");
 }
+
 
 void err_handler(OCI_Error *err)
 {
@@ -1204,146 +1223,55 @@ int main()
 	//	//return 0;
 	//}
 
-	//int tm_mday; /* 一个月中的日期 - 取值区间为[1,31] */
-	//int tm_mon; /* 月份（从一月开始，0代表一月） - 取值区间为[0,11] */
-	//int tm_year; /* 年份，其值等于实际年份减去1900 */
-	//int tm_wday; /* 星期 – 取值区间为[0,6]，其中0代表星期天，1代表星期一，以此类推 atoi*/
+	//market
+	std::string c_marketAddress;
 
-	/*
-	struct tm *ptr;
-	time_t lt;
-	lt = time(NULL);
-	//lt = time_t(1487959830);
-	ptr = localtime(&lt);
-	
+	//oracle
+	std::string c_oracle_DomainName;
+	int c_oracle_Port;
+	std::string c_oracle_UserID;
+	std::string c_oracle_Password;
 
-	printf("second:%d\n", ptr->tm_sec);
-	printf("minute:%d\n", ptr->tm_min);
-	printf("hour:%d\n", ptr->tm_hour);
-	printf("wday:%d\n", ptr->tm_wday);
-	printf("mday:%d\n", ptr->tm_mday);
-	printf("month:%d\n", ptr->tm_mon + 1);
-	printf("year:%d\n", ptr->tm_year + 1900);
+	//redis
+	std::string c_redis_DomainName;
+	int c_redis_Port;
 
-	int wday = ptr->tm_wday;
+	const char ConfigFile[] = "config.txt";
+	Config configSettings(ConfigFile);
 
-	int nowDayOfWeek = (wday == 0) ? 7 : wday - 1; //今天是本周的第几天。周一=0，周日=6
+	c_marketAddress = configSettings.Read("marketAddress", c_marketAddress);
 
-	int nowTime = (int)lt;
+	c_oracle_DomainName = configSettings.Read("oracle_DomainName", c_oracle_DomainName);
+	c_oracle_Port = configSettings.Read("oracle_Port", 0);
+	c_oracle_UserID = configSettings.Read("oracle_UserID", c_oracle_UserID);
+	c_oracle_Password = configSettings.Read("oracle_Password", c_oracle_Password);
 
+	c_redis_DomainName = configSettings.Read("redis_DomainName", c_redis_DomainName);
+	c_redis_Port = configSettings.Read("redis_Port", 0);
 
-	/*time_t now;
-	int nowTime = (int)time(&now);
-	nowTime = 1489687830;*/
-	
-	/*
-	//周一
-	int MomdayTime = nowTime - nowDayOfWeek * 24 * 60 * 60;
-
-	//周五 
-	int SaturdayTime = MomdayTime + 4 * 24 * 60 * 60;
-
-	char week[20] = "";
-	strftime(week, sizeof(week), "%A", ptr);
-	if (strcmp(week, "Saturday") == 0)
-	{
-		SaturdayTime = SaturdayTime + 7 * 24 * 60 * 60;
-	}
-
-	//strftime(s, sizeof(s), "%H:%M", &tm);
+	std::cout << "marketAddress:" << c_marketAddress << "\n" << std::endl;
+	std::cout << "oracle_DomainName:" << c_oracle_DomainName << std::endl;
+	std::cout << "oracle_Port:" << c_oracle_Port << std::endl;
+	std::cout << "oracle_UserID:" << c_oracle_UserID << std::endl;
+	std::cout << "oracle_Password:" << c_oracle_Password << "\n" << std::endl;
+	std::cout << "redis_DomainName:" << c_redis_DomainName << std::endl;
+	std::cout << "redis_Port:" << c_redis_Port << "\n" << std::endl;
 
 
-	char jointDate[50] = "";
-	//月初
-	sprintf_s(jointDate, "%d-%d-%d %d:%d:%d", ptr->tm_year + 1900, ptr->tm_mon + 1, 1, 0, 0, 0);
-	int startMon = StringToDatetime(jointDate);
+	strcpy(marketAddress, c_marketAddress.c_str());
 
-	//月末
-	sprintf_s(jointDate, "%d-%d-%d %d:%d:%d", ptr->tm_year + 1900, ptr->tm_mon + 1 + 1, 1, 0, 0, 0);
-	int endMon = StringToDatetime(jointDate);
-	endMon = endMon - 24 * 60 * 60;
+	strcpy(oracle_DomainName, c_oracle_DomainName.c_str());
+	oracle_Port = c_oracle_Port;
+	strcpy(oracle_UserID, c_oracle_UserID.c_str());
+	strcpy(oracle_Password, c_oracle_Password.c_str());
 
+	strcpy(redis_DomainName, c_redis_DomainName.c_str());
+	redis_Port = c_redis_Port;
 
-	int end_Month = ptr->tm_mon + 1;
-
-	lt = time_t(1488211200);
-	ptr = localtime(&lt);
-	int max_Month = ptr->tm_mon + 1;
-
-	if (max_Month != end_Month)
-	{
-		printf("---end_time_month=%d--max_time_month=%d--\n", end_Month, max_Month);
-	}
-
-	char nowtTime[100] = "2014-02-14 20:47:00";
-	int a =  StringToDatetime(nowtTime);
-	*/
-
-
-	//ConnrectionOracle();
-	
+	ConnrectionOracle();
 
 	ConnrectionRedis();
 
-	struct tm *r_ptr;
-	time_t r_lt;
-	r_lt = time(NULL);
-
-	int dds = (int)r_lt;
-	int b = (int(dds) + 28800) % int(86400);
-
-	//仿行情日期 时间大于等于20：00 就属于 下一个交易日
-	if ((b >= 72000))
-	{
-		dds = dds + 24 * 60 * 60;
-		//printf("开盘时间");
-	}
-	r_lt = time_t(dds);
-	r_ptr = localtime(&r_lt);
-	//周 K
-	int wday = r_ptr->tm_wday;
-	int nowDayOfWeek = (wday == 0) ? 7 : wday - 1; //今天是本周的第几天。周一=0，周日=6
-	int nowTime = (int)r_lt;
-	/*time_t now;
-	int nowTime = (int)time(&now);
-	nowTime = 1489687830;*/
-	//周一
-	int MomdayTime = nowTime - nowDayOfWeek * 24 * 60 * 60;
-
-	//周五 
-	int SaturdayTime = MomdayTime + 4 * 24 * 60 * 60;
-
-	//如果是周六则算为下周
-	char week[20] = "";
-	strftime(week, sizeof(week), "%A", ptr);
-	if (strcmp(week, "Saturday") == 0)
-	{
-		SaturdayTime = SaturdayTime + 7 * 24 * 60 * 60;
-	}
-
-	MomdayTime = MomdayTime - (int(MomdayTime) + 28800) % int(86400);
-
-	int num = nowDayOfWeek;
-	int sum = 0;
-	char tempName[100] = "";
-	sprintf_s(tempName, "%s_%s", InstrumentID, "f1_day");
-
-	for (int x = 0; x < num; x++)
-	{
-		int timeV = MomdayTime + x * 24 * 60 * 60;
-		reply = (redisReply *)redisCommand(rc, "HGET  %s %d", tempName, timeV);
-		if (reply->str != NULL)
-		{
-			cJSON *root = cJSON_Parse(reply->str);
-			int  total_v = cJSON_GetObjectItem(root, "v")->valueint;
-			sum += total_v;
-			//printf("最小time=%d--最大time=%d=dds-%d=实时V=%d==最大V=%d==间隔V=%d--\n", min_time, max_time, dds,v, total_v, fenshiInterval_v);
-		}
-		freeReplyObject(reply);
-	}
-	week_v = sum;
-
-	
 	// 产生一个CQdpFtdcMduserApi实例
 	CQdpFtdcMduserApi *pUserApi = CQdpFtdcMduserApi::CreateFtdcMduserApi();
 	// 产生一个事件处理的实例
@@ -1356,7 +1284,7 @@ int main()
 	///        TERT_QUICK:先传送当前行情快照,再传送登录后市场行情的内容	//pUserApi-> SubscribeMarketDataTopic (101, TERT_RESUME);
 	//pUserApi-> SubscribeMarketDataTopic (110, QDP_TERT_RESTART);
 	// 设置行情发布服务器的地址
-	pUserApi->RegisterFront(MarketIP);
+	pUserApi->RegisterFront(marketAddress);
 	//pUserApi->RegisterFront("tcp://hqsource.onehgold.com:30007");
 
 	// 使客户端开始与行情发布服务器建立连接
@@ -1365,7 +1293,6 @@ int main()
 	pUserApi->Release();
 
 	_CrtDumpMemoryLeaks();
-
 
 	return 0;
 }
