@@ -63,15 +63,15 @@ redisReply *reply;
 char   dateTime[100];
 
 //market tcp
-char marketAddress[40];
+char marketAddress[50];
 //oracle
-char oracle_DomainName[40];
+char oracle_DomainName[50];
 int  oracle_Port;
-char oracle_UserID[20];
-char oracle_Password[20];
+char oracle_UserID[50];
+char oracle_Password[50];
 
 //redis
-char redis_DomainName[40];
+char redis_DomainName[50];
 int  redis_Port;
 
 //Á¬½Óredis

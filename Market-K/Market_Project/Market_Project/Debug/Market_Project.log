@@ -1,11 +1,10 @@
 ﻿  cJSON.c
   main.cpp
-g:\ykf_git\market-k\market_project\market_project\main.cpp(626): warning C4554: “&”: 检查运算符优先级可能存在的错误；使用圆括号阐明优先级
-g:\ykf_git\market-k\market_project\market_project\main.cpp(627): warning C4554: “&”: 检查运算符优先级可能存在的错误；使用圆括号阐明优先级
-g:\ykf_git\market-k\market_project\market_project\main.cpp(797): warning C4244: “初始化”: 从“time_t”转换到“int”，可能丢失数据
-g:\ykf_git\market-k\market_project\market_project\main.cpp(801): warning C4244: “初始化”: 从“time_t”转换到“int”，可能丢失数据
-g:\ykf_git\market-k\market_project\market_project\main.cpp(995): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
-g:\ykf_git\market-k\market_project\market_project\main.cpp(693): warning C4101: “isHalfHour”: 未引用的局部变量
+g:\ykf_git\market-k\market_project\market_project\main.cpp(475): warning C4554: “&”: 检查运算符优先级可能存在的错误；使用圆括号阐明优先级
+g:\ykf_git\market-k\market_project\market_project\main.cpp(476): warning C4554: “&”: 检查运算符优先级可能存在的错误；使用圆括号阐明优先级
+g:\ykf_git\market-k\market_project\market_project\main.cpp(646): warning C4244: “初始化”: 从“time_t”转换到“int”，可能丢失数据
+g:\ykf_git\market-k\market_project\market_project\main.cpp(650): warning C4244: “初始化”: 从“time_t”转换到“int”，可能丢失数据
+g:\ykf_git\market-k\market_project\market_project\main.cpp(844): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
   DBOperation.cpp
   Confi.cpp
   正在生成代码...

@@ -25,36 +25,9 @@
 #pragma comment(lib,"ocilibm.lib")
 #pragma comment(lib,"ocilibw.lib")
 using namespace std;
-
-//#define environment 1  //d 开发环境
-//#define environment 2  //t 测试环境
-//#define environment 3  //  正式环境
-
-//#define environment 1  //d 开发环境
-//#define environment 2  //t 测试环境
-//#define environment 3  //  正式环境
-
-//#define environment 3
-//#define MarketIP "tcp://101.226.241.234:30007"
-
-//#if environment == 1
-//#define redisDomainName  "redisd.onehgold.com"
-//#define oracleDomainName "dbd1.onehgold.com"
-//
-//#elif environment == 2
-//#define redisDomainName  "redist.onehgold.com"
-//#define oracleDomainName "dbt1.onehgold.com"
-//
-//#else
-//#define redisDomainName  "redis.onehgold.com"
-//#define oracleDomainName "db1.onehgold.com"
-//
-//#endif 
-
-//k线间隔
+ 
 
 HANDLE hMutex;
-
 CDBOperation dbOper;
 
 redisContext *rc;
@@ -71,15 +44,15 @@ int week_v = 0;
 int month_v = 0;
 
 //market tcp
-char marketAddress[40];
+char marketAddress[50];
 //oracle
-char oracle_DomainName[40];
+char oracle_DomainName[50];
 int  oracle_Port;
-char oracle_UserID[20];
-char oracle_Password[20];
+char oracle_UserID[50];
+char oracle_Password[50];
 
 //redis
-char redis_DomainName[40];
+char redis_DomainName[50];
 int  redis_Port;
 
 //连接redis
@@ -117,7 +90,6 @@ void ConnrectionOracle()
 	if (false == bConn)
 	{
 		printf("连接数据库出现错误\n");
-		//system("PAUSE");
 		//return;
 	}
 	else
@@ -131,16 +103,6 @@ void err_handler(OCI_Error *err)
 {
 	printf("Error ORA-%05i - msg : %s\n", OCI_ErrorGetOCICode(err), OCI_ErrorGetString(err));
 }
-
-typedef struct times
-{
-	int Year;
-	int Mon;
-	int Day;
-	int Hour;
-	int Min;
-	int Second;
-}Times;
 
 //字符串转化为时间戳
 time_t StringToDatetime(const char *strTime)
@@ -175,8 +137,6 @@ void DatetimeToString(time_t time)
 
 void stamp_to_standard(int stampTime, char a[100], char week[100])
 {
-	//printf("a=%s=\n ", a);
-
 	time_t tick = (time_t)stampTime;
 	struct tm tm;
 	char s[100];
@@ -234,43 +194,6 @@ int compare_time_60(int time,int time_interval_local,char marketDate[100])
 	return endTime_60;
 }
 
-//bool compare_time_60(int time, char week[30])
-//{
-//
-//	int	b = (int(time) + 28800) % int(86400);
-//
-//	if (b >= 7200 && b <= 9000)
-//	{
-//		if (strcmp(week, "Saturday") == 0)
-//		{
-//			specialTime = (8 + 48) * 60 * 60;
-//		}
-//		else
-//		{
-//			specialTime = 8 * 60 * 60;
-//		}
-//		//特殊情况2:30分
-//		if (b == 9000)
-//		{
-//			specialTime = specialTime - 60 * 60;
-//		}
-//	}
-//	else
-//	{
-//		specialTime = 60 * 60;
-//	}
-//
-//	//判断时间戳是否是半小时区间 最后结果减去半小时
-//	if (b >= 7200 && b <= 55800)
-//	{
-//		return true;
-//	}
-//	else
-//	{
-//		return false;
-//	}
-//}
-
 int compare_time_240(char marketDate[100])
 {
 	int endTime_240;
@@ -294,35 +217,6 @@ int compare_time_240(char marketDate[100])
 	return endTime_240;
 }
 
-//int compare_time_240(int time, char week[30])
-//{
-//	int endTime_240;
-//	//00:00 10:30 15:30 00:00
-//	int a = time - (int(time) + 28800) % int(86400);
-//	int	b = (int(time) + 28800) % int(86400);
-//
-//	if (b >= 0 && b < 37800)
-//	{
-//		if (strcmp(week, "Saturday") == 0)
-//		{
-//			endTime_240 = a + 48 * 60 * 60 + 37800;
-//		}
-//		else
-//		{
-//			endTime_240 = a + 37800;
-//		}
-//	}
-//	else if (b >= 37800 && b < 55800)
-//	{
-//		endTime_240 = a + 55800;
-//	}
-//	else
-//	{
-//		endTime_240 = a + 86400;
-//	}
-//	return endTime_240;
-//}
-
 char* substring(char* ch, int pos, int length)
 {
 	char* pch = ch;
@@ -340,34 +234,6 @@ char* substring(char* ch, int pos, int length)
 	}
 	subch[length] = '\0';//加上字符串结束符。  
 	return subch;       //返回分配的字符数组地址。  
-}
-
-void del_char(char str[], char d[])
-{
-	int i = 0, j = 0;
-	while (str[i] != '\0')
-	{
-
-		if ((str[i] != d[0]) & (str[i] != d[1]) & (str[i] != d[2]))
-		{
-			str[j++] = str[i++];
-		}
-		else
-		{
-			i++;
-		}
-	}
-	str[j] = '\0';
-}
-
-char * replaceAll(char * src, char oldChar, char newChar) {
-	char * head = src;
-	while (*src != '\0') {
-		if (*src == oldChar) 
-			*src = newChar;
-		src++;
-	}
-	return head;
 }
 
 //删除特殊字符  || 替换其他特殊字符
@@ -414,7 +280,6 @@ public:
 		strcpy(reqUserLogin.Password, "88760");
 		m_pUserApi->ReqUserLogin(&reqUserLogin, 0);
 	}
-
 
 	// 当客户端与行情发布服务器通信连接断开时，该方法被调用
 	void OnFrontDisconnected()
@@ -539,19 +404,6 @@ public:
 			pMarketData->AskPrice5,
 			pMarketData->AskVolume5
 		);
-
-
-		/*
-		if (pMarketData->AskPrice1 == DBL_MAX)
-		printf("%s,", "");
-		else
-		printf("%f,", pMarketData->AskPrice1);
-
-		if (pMarketData->BidPrice1 == DBL_MAX)
-		printf("%s \n", "");
-		else
-		printf("%f \n", pMarketData->BidPrice1);
-		*/
 	}
 
 	// 深度行情通知，行情服务器会主动通知客户端
@@ -595,16 +447,10 @@ public:
 		strcat(market_time_str, time_hms);
 		int market_Updatetimes = (int)StringToDatetime(market_time_str);
 
-		//2017 / 3 / 29 0:00: 0
-		//market_Updatetimes = 1490716800;
-
-		//market_Updatetimes = 1490716860;
-
 
 		//行情日期+行情时分秒
 		struct tm *r_ptr;
 		time_t r_lt;
-
 		strcpy(marketDate, pMarketData->TradingDay);
 		sprintf_s(marketDate, "%s-%s-%s", substring(marketDate, 0, 4), substring(marketDate, 4, 2), substring(marketDate, 6, 2));
 		strcpy(r_Market_time_str, marketDate);
@@ -634,6 +480,7 @@ public:
 		else
 		{
 			//printf("休盘时间\n");
+			//休盘时间 直接跳出回调函数
 			return;
 		}
 
@@ -693,12 +540,12 @@ public:
 
 		char name[30] = "";
 		int time_interval_local;
-		bool isHalfHour;
+
+		/*bool isHalfHour;
 		char h_m[30] = "";
-		char week[30] = "";
+		/*char week[30] = "";
+		stamp_to_standard(market_Updatetimes, h_m, week);*/
 
-
-		stamp_to_standard(market_Updatetimes, h_m, week);
 		lt = time_t(market_Updatetimes);
 		ptr = localtime(&lt);
 
@@ -719,7 +566,6 @@ public:
 		for (int i = 0; i < len; ++i)
 		{	
 			endTime = 0;
-
 			//printf("--%s--%d--\n", nameArray[i], time_interval_local_array[i]);
 			//设定k线名字和时间间隔
 			strcpy(name, nameArray[i]);
