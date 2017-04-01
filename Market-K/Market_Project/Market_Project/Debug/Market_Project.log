@@ -1,0 +1,10 @@
+﻿  main.cpp
+g:\market_green\market-3-30-debug\market_project\market_project\main.cpp(598): warning C4554: “&”: 检查运算符优先级可能存在的错误；使用圆括号阐明优先级
+g:\market_green\market-3-30-debug\market_project\market_project\main.cpp(599): warning C4554: “&”: 检查运算符优先级可能存在的错误；使用圆括号阐明优先级
+g:\market_green\market-3-30-debug\market_project\market_project\main.cpp(769): warning C4244: “初始化”: 从“time_t”转换到“int”，可能丢失数据
+g:\market_green\market-3-30-debug\market_project\market_project\main.cpp(773): warning C4244: “初始化”: 从“time_t”转换到“int”，可能丢失数据
+g:\market_green\market-3-30-debug\market_project\market_project\main.cpp(967): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+g:\market_green\market-3-30-debug\market_project\market_project\main.cpp(665): warning C4101: “isHalfHour”: 未引用的局部变量
+C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(1193,5): warning MSB8030: The linker switch "Minimum Required Version" requires "SubSystem" to be set.  Without "SubSystem", the "Minimum Required Version" would not be passed to linker and could prevent to the output binary from running on older Operating Systems.
+  Market_Project.vcxproj -> G:\Market_green\Market-3-30-debug\Market_Project\Debug\Market_Project.exe
+  Market_Project.vcxproj -> G:\Market_green\Market-3-30-debug\Market_Project\Debug\Market_Project.pdb (Full PDB)

@@ -1,0 +1,12 @@
+//Market TCP 
+marketAddress = tcp://101.226.241.234:30007
+
+//oracle
+oracle_DomainName = dbd1.onehgold.com
+oracle_Port = 1521
+oracle_UserID = HQ
+oracle_Password = Abcd1234
+
+//redis
+redis_DomainName = redisd.onehgold.com
+redis_Port = 6379
