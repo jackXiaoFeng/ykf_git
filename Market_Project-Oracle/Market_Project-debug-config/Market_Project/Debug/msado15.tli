@@ -1,9 +1,9 @@
-﻿// Created by Microsoft (R) C/C++ Compiler Version 14.00.24215.1 (45e5dfdb).
+﻿// Created by Microsoft (R) C/C++ Compiler Version 14.00.24215.1 (1c18328b).
 //
-// g:\market_project-debug - 副本\market_project\debug\msado15.tli
+// g:\ykf_git\market_project-oracle\market_project-debug-config\market_project\debug\msado15.tli
 //
 // Wrapper implementations for type library C:\Program Files\Common Files\System\ado\msado15.dll
-// compiler-generated file created 04/01/17 at 11:48:52 - DO NOT EDIT!
+// compiler-generated file created 04/01/17 at 15:48:27 - DO NOT EDIT!
 
 #pragma once
 

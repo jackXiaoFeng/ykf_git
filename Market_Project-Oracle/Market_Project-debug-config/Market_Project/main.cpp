@@ -112,7 +112,11 @@ void ConnrectionOracle()
 		//system("PAUSE");
 		//return;
 	}
-	printf("连接oracle成功!\n");
+	else
+	{
+		printf("连接oracle成功!\n");
+
+	}
 }
 
 void err_handler(OCI_Error *err)
