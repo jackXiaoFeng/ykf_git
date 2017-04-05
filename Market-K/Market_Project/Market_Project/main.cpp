@@ -206,7 +206,7 @@ int compare_time_240(char marketDate[100])
 		sprintf_s(s, "%s %s", marketDate, "10:30:00");
 		endTime_240 = (int)StringToDatetime(s);
 	}
-	else if (nowTimestamp_Surplus >= 37800 && nowTimestamp_Surplus < 55800)
+	else if (nowTimestamp_Surplus >= 37800 && nowTimestamp_Surplus < 55860)
 	{
 		endTime_240 = nowTimestamp_Zero + 55800;
 	}
@@ -427,16 +427,6 @@ public:
 			//printf("pMarketData->InstrumentID=%s\n\n", pMarketData->InstrumentID);
 		}
 
-		//if (!(strcmp(pMarketData->InstrumentID, "Ag(T+D)") == 0))
-		//{
-		//	return;
-		//}
-		//else
-		//{
-		//	//printf("pMarketData->InstrumentID=%s\n\n", pMarketData->InstrumentID);
-		//}
-		
-		
 		//行情更新时间为  本地日期年月日 拼接行情时分秒
 		char nowtDate[100] = "";
 		char marketDate[100] = "";
@@ -535,11 +525,11 @@ public:
 			15 * 60,
 			30 * 60,
 			60 * 60,
-			240 * 60 * 60,//设定好值 间隔判断作废
+			240 * 60,
 			60,
-			24*60*60*60,//设定好值 间隔判断作废
-			7* 24 * 60 * 60,//设定好值 间隔判断作废
-			32 * 24 * 60 * 60 //设定好值 间隔判断作废
+			24*60*60,
+			7* 24 * 60 * 60,
+			32 * 24 * 60 * 60 
 		};
 
 		/*char *nameArray[1] = { "" };
