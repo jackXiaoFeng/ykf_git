@@ -525,82 +525,82 @@ public:
 		//oracle时间戳类型 格式要遵循 yyyy - mm - dd hh : 24mi : ss.ff
 
 		//执行更新 表 语句
-		sprintf_s(sql, "UPDATE QUOTATION SET TRADINGDAY  = '%s',SETTLEMENTGROUPID = '%s',SETTLEMENTID = %d,UPDATETIME = '%s',UPDATEMILLISEC = %d,EXCHANGEID = '%s',PRESETTLEMENTPRICE = %f,PRECLOSEPRICE = %f,PREOPENINTEREST = %f,PREDELTA = %f,OPENPRICE = %f,HIGHESTPRICE = %f,LOWESTPRICE = %f,CLOSEPRICE = %f, UPPERLIMITPRICE = %f,LOWERLIMITPRICE = %f,SETTLEMENTPRICE = %f,CURRDELTA = %f,LASTPRICE = %f,VOLUME = %d,TURNOVER = %f,OPENINTEREST = %f,BIDPRICE1 = %f,BIDVOLUME1 = %d,ASKPRICE1 = %f,ASKVOLUME1 = %d,BIDPRICE2 = %f,BIDVOLUME2 = %d,ASKPRICE2 = %f,ASKVOLUME2 = %d,BIDPRICE3 = %f,BIDVOLUME3 = %d,ASKPRICE3 = %f,ASKVOLUME3 = %d,BIDPRICE4 = %f,BIDVOLUME4 = %d,ASKPRICE4 = %f,ASKVOLUME4 = %d,BIDPRICE5 = %f,BIDVOLUME5 = %d,ASKPRICE5 = %f,ASKVOLUME5 = %d,DATET = to_date('%s','yyyymmddhh24miss'),DATED = %d WHERE INSTRUMENTID = '%s'",
-			pMarketData->TradingDay,
-			pMarketData->SettlementGroupID,
-			pMarketData->SettlementID,
+		//sprintf_s(sql, "UPDATE QUOTATION SET TRADINGDAY  = '%s',SETTLEMENTGROUPID = '%s',SETTLEMENTID = %d,UPDATETIME = '%s',UPDATEMILLISEC = %d,EXCHANGEID = '%s',PRESETTLEMENTPRICE = %f,PRECLOSEPRICE = %f,PREOPENINTEREST = %f,PREDELTA = %f,OPENPRICE = %f,HIGHESTPRICE = %f,LOWESTPRICE = %f,CLOSEPRICE = %f, UPPERLIMITPRICE = %f,LOWERLIMITPRICE = %f,SETTLEMENTPRICE = %f,CURRDELTA = %f,LASTPRICE = %f,VOLUME = %d,TURNOVER = %f,OPENINTEREST = %f,BIDPRICE1 = %f,BIDVOLUME1 = %d,ASKPRICE1 = %f,ASKVOLUME1 = %d,BIDPRICE2 = %f,BIDVOLUME2 = %d,ASKPRICE2 = %f,ASKVOLUME2 = %d,BIDPRICE3 = %f,BIDVOLUME3 = %d,ASKPRICE3 = %f,ASKVOLUME3 = %d,BIDPRICE4 = %f,BIDVOLUME4 = %d,ASKPRICE4 = %f,ASKVOLUME4 = %d,BIDPRICE5 = %f,BIDVOLUME5 = %d,ASKPRICE5 = %f,ASKVOLUME5 = %d,DATET = to_date('%s','yyyymmddhh24miss'),DATED = %d WHERE INSTRUMENTID = '%s'",
+		//	pMarketData->TradingDay,
+		//	pMarketData->SettlementGroupID,
+		//	pMarketData->SettlementID,
 
-			pMarketData->UpdateTime,
-			pMarketData->UpdateMillisec,
-			pMarketData->ExchangeID,
+		//	pMarketData->UpdateTime,
+		//	pMarketData->UpdateMillisec,
+		//	pMarketData->ExchangeID,
 
-			//昨
-			pMarketData->PreSettlementPrice,
-			pMarketData->PreClosePrice,
-			pMarketData->PreOpenInterest,
-			pMarketData->PreDelta,
+		//	//昨
+		//	pMarketData->PreSettlementPrice,
+		//	pMarketData->PreClosePrice,
+		//	pMarketData->PreOpenInterest,
+		//	pMarketData->PreDelta,
 
-			//今
-			pMarketData->OpenPrice,
-			pMarketData->HighestPrice,
-			pMarketData->LowestPrice,
-			pMarketData->ClosePrice,
+		//	//今
+		//	pMarketData->OpenPrice,
+		//	pMarketData->HighestPrice,
+		//	pMarketData->LowestPrice,
+		//	pMarketData->ClosePrice,
 
-			pMarketData->UpperLimitPrice,
-			pMarketData->LowerLimitPrice,
-			pMarketData->SettlementPrice,
-			pMarketData->CurrDelta,
+		//	pMarketData->UpperLimitPrice,
+		//	pMarketData->LowerLimitPrice,
+		//	pMarketData->SettlementPrice,
+		//	pMarketData->CurrDelta,
 
-			//其他
-			pMarketData->LastPrice,
-			pMarketData->Volume,
-			pMarketData->Turnover,
-			pMarketData->OpenInterest,
+		//	//其他
+		//	pMarketData->LastPrice,
+		//	pMarketData->Volume,
+		//	pMarketData->Turnover,
+		//	pMarketData->OpenInterest,
 
-			//申
-			//一
-			pMarketData->BidPrice1,
-			pMarketData->BidVolume1,
-			pMarketData->AskPrice1,
-			pMarketData->AskVolume1,
+		//	//申
+		//	//一
+		//	pMarketData->BidPrice1,
+		//	pMarketData->BidVolume1,
+		//	pMarketData->AskPrice1,
+		//	pMarketData->AskVolume1,
 
-			//二
-			pMarketData->BidPrice2,
-			pMarketData->BidVolume2,
-			pMarketData->AskPrice2,
-			pMarketData->AskVolume2,
+		//	//二
+		//	pMarketData->BidPrice2,
+		//	pMarketData->BidVolume2,
+		//	pMarketData->AskPrice2,
+		//	pMarketData->AskVolume2,
 
-			//三
-			pMarketData->BidPrice3,
-			pMarketData->BidVolume3,
-			pMarketData->AskPrice3,
-			pMarketData->AskVolume3,
+		//	//三
+		//	pMarketData->BidPrice3,
+		//	pMarketData->BidVolume3,
+		//	pMarketData->AskPrice3,
+		//	pMarketData->AskVolume3,
 
-			//四
-			pMarketData->BidPrice4,
-			pMarketData->BidVolume4,
-			pMarketData->AskPrice4,
-			pMarketData->AskVolume4,
+		//	//四
+		//	pMarketData->BidPrice4,
+		//	pMarketData->BidVolume4,
+		//	pMarketData->AskPrice4,
+		//	pMarketData->AskVolume4,
 
-			//五
-			pMarketData->BidPrice5,
-			pMarketData->BidVolume5,
-			pMarketData->AskPrice5,
-			pMarketData->AskVolume5,
-			nowtTime,
-			market_Updatetimes,
+		//	//五
+		//	pMarketData->BidPrice5,
+		//	pMarketData->BidVolume5,
+		//	pMarketData->AskPrice5,
+		//	pMarketData->AskVolume5,
+		//	nowtTime,
+		//	market_Updatetimes,
 
-			pMarketData->InstrumentID
-		);
-		pRst = dbOper.ExecuteWithResSQL(sql);
-		if (NULL != pRst)
-		{
-			//printf("更新行情种类-%s---成功\n", pMarketData->InstrumentID);
-		}
-		else
-		{
-			printf("更新行情种类---失败\n");
-		}
+		//	pMarketData->InstrumentID
+		//);
+		//pRst = dbOper.ExecuteWithResSQL(sql);
+		//if (NULL != pRst)
+		//{
+		//	//printf("更新行情种类-%s---成功\n", pMarketData->InstrumentID);
+		//}
+		//else
+		//{
+		//	printf("更新行情种类---失败\n");
+		//}
 
 		//执行插入历史表语句  
 		sprintf_s(sql, "INSERT INTO %s (TRADINGDAY,SETTLEMENTGROUPID,SETTLEMENTID,INSTRUMENTID,UPDATETIME,UPDATEMILLISEC,EXCHANGEID,PRESETTLEMENTPRICE,PRECLOSEPRICE,PREOPENINTEREST,PREDELTA,OPENPRICE,HIGHESTPRICE,LOWESTPRICE,CLOSEPRICE,UPPERLIMITPRICE,LOWERLIMITPRICE,SETTLEMENTPRICE,CURRDELTA,LASTPRICE,VOLUME,TURNOVER,OPENINTEREST,BIDPRICE1,BIDVOLUME1,ASKPRICE1,ASKVOLUME1,BIDPRICE2,BIDVOLUME2,ASKPRICE2,ASKVOLUME2,BIDPRICE3,BIDVOLUME3,ASKPRICE3,ASKVOLUME3,BIDPRICE4,BIDVOLUME4,ASKPRICE4,ASKVOLUME4,BIDPRICE5,BIDVOLUME5,ASKPRICE5,ASKVOLUME5,DATET,DATED) VALUES ('%s','%s',%d,'%s','%s',%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,to_date('%s','yyyymmddhh24miss'),%d)",
@@ -678,7 +678,7 @@ public:
 		}
 		else
 		{
-			printf("插入历史数据--失败\n");
+			printf("插入历史数据-%s--失败\n",pMarketData->InstrumentID);
 		}
 
 		char str_el[20] = "";
@@ -861,6 +861,45 @@ int main(int   argc, char*   argv[])
 	//	//return 0;
 	//}
 
+	char buf[1000];
+	GetCurrentDirectory(1000, buf);  //得到当前工作路径
+
+									 //拼接路径
+	char tmpc1[1000];
+	char tmpc2[] = "/config.txt";
+	strcpy(tmpc1, buf);
+	strcat(tmpc1, tmpc2);
+
+	string line;
+	ifstream inf(tmpc1);
+	if (inf.is_open())
+	{
+		//while (getline(inf, line))
+		//{
+		//	if (!line.empty())
+		//	{
+		//		istringstream iss(line);
+		//		vector<string> tokens;
+		//		copy(istream_iterator<string>(iss), istream_iterator<string>(), back_inserter<vector<string>>(tokens));
+		//		for (vector<string>::iterator it = tokens.begin(); it != tokens.end(); ++it)
+		//		{
+		//			if ((*it).find(".txt") != string::npos)
+		//				filenamesv.push_back(*it);
+		//				cout << *it << endl; //the file names
+		//		}
+		//	}
+		//}
+		inf.close();
+	}
+	else
+	{
+		cout << "Uanble to open the file\n";
+		return 0;
+	}
+
+
+
+
 	//market
 	std::string c_marketAddress;
 
@@ -874,8 +913,7 @@ int main(int   argc, char*   argv[])
 	std::string c_redis_DomainName;
 	int c_redis_Port;
 
-	const char ConfigFile[] = "config.txt";
-	Config configSettings(ConfigFile);
+	Config configSettings(tmpc1);
 
 	c_marketAddress = configSettings.Read("marketAddress", c_marketAddress);
 
@@ -887,7 +925,7 @@ int main(int   argc, char*   argv[])
 	c_redis_DomainName = configSettings.Read("redis_DomainName", c_redis_DomainName);
 	c_redis_Port = configSettings.Read("redis_Port", 0);
 
-	std::cout << "marketAddress:" << c_marketAddress <<"\n"<< std::endl;
+	std::cout << "marketAddress:" << c_marketAddress << "\n" << std::endl;
 	std::cout << "oracle_DomainName:" << c_oracle_DomainName << std::endl;
 	std::cout << "oracle_Port:" << c_oracle_Port << std::endl;
 	std::cout << "oracle_UserID:" << c_oracle_UserID << std::endl;

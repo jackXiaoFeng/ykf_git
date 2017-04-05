@@ -164,11 +164,12 @@ int compare_time_60(int time,int time_interval_local,char marketDate[100])
 	}
 	else
 	{
-		if ((nowTimestamp_Surplus = 9000) ||
-			(nowTimestamp_Surplus = 41400) ||
-			(nowTimestamp_Surplus = 55800))
+		if ((nowTimestamp_Surplus >= 9000 && nowTimestamp_Surplus < 9060) ||
+			(nowTimestamp_Surplus >= 41400 && nowTimestamp_Surplus < 41460) ||
+			(nowTimestamp_Surplus >= 55800 && nowTimestamp_Surplus < 55860))
 		{
 			//特殊收盘时间k线不加间隔
+			endTime_60 = time;
 		}
 		else
 		{
@@ -425,6 +426,15 @@ public:
 		{
 			//printf("pMarketData->InstrumentID=%s\n\n", pMarketData->InstrumentID);
 		}
+
+		//if (!(strcmp(pMarketData->InstrumentID, "Ag(T+D)") == 0))
+		//{
+		//	return;
+		//}
+		//else
+		//{
+		//	//printf("pMarketData->InstrumentID=%s\n\n", pMarketData->InstrumentID);
+		//}
 		
 		
 		//行情更新时间为  本地日期年月日 拼接行情时分秒
@@ -471,9 +481,10 @@ public:
 		nowTimestamp_Zero = dds - (int(dds) + 28800) % int(86400);
 		nowTimestamp_Surplus = (int(dds) + 28800) % int(86400);
 
-		if ((nowTimestamp_Surplus > 72000 || nowTimestamp_Surplus <= 9000) ||
-			(nowTimestamp_Surplus >32400 &   nowTimestamp_Surplus <= 41400) ||
-			(nowTimestamp_Surplus >48600 &   nowTimestamp_Surplus <= 55800))
+		//停盘时间加一分钟 是为了结束时30:00分会有报单
+		if ((nowTimestamp_Surplus > 72000 || nowTimestamp_Surplus < 9060) ||
+			(nowTimestamp_Surplus >32400 &   nowTimestamp_Surplus < 41460) ||
+			(nowTimestamp_Surplus >48600 &   nowTimestamp_Surplus < 55860))
 		{
 			//printf("开盘时间");
 		}
@@ -571,6 +582,7 @@ public:
 			strcpy(name, nameArray[i]);
 			sprintf_s(myhash, "%s_%s", InstrumentID, name);
 			sprintf_s(myhash_v, "%s_%s_%s", InstrumentID, name, "CurrentV");
+			//printf("ssss---%d--%s-\n", nowTimestamp_Surplus, name);
 
 			if (i == 4)
 			{
@@ -675,11 +687,13 @@ public:
 			else
 			{
 				time_interval_local = time_interval_local_array[i];
-				if ((nowTimestamp_Surplus= 9000) ||
-					(nowTimestamp_Surplus= 41400) ||
-					(nowTimestamp_Surplus= 55800))
+				if ((nowTimestamp_Surplus >= 9000 && nowTimestamp_Surplus < 9060) ||
+					(nowTimestamp_Surplus >= 41400 && nowTimestamp_Surplus < 41460) ||
+					(nowTimestamp_Surplus >= 55800 && nowTimestamp_Surplus < 55860))
 				{
 					//特殊收盘时间k线不加间隔
+					printf("进入-%d---%s-----------去秒时间=%d---实际时间=%d---行情时间=%d----\n", nowTimestamp_Surplus,InstrumentID, endTime, market_Updatetimes);
+					endTime = market_Updatetimes;
 				}
 				else
 				{
@@ -717,8 +731,8 @@ public:
 					double current_minl;
 					double current_sl;
 
-					double sum_el;
-					int v_changeNum;
+					double sum_el = 0.0;
+					int v_changeNum = 0;
 						
 					if (!(i== fenshi_i))
 					{
@@ -755,8 +769,9 @@ public:
 						{
 							isMonth = true;
 						}
-
 					}
+
+					int upD = false;
 
 					if (endTime - max_time >= time_interval_local_array[i] || isMonth)
 					{
@@ -780,7 +795,7 @@ public:
 							now_time_v = v + month_v;
 						}
 
-						printf("<<v=%d<<<<<interval_v=%d<<<<<current_v=%d<<<<<<<<：%d：>>>>>>>>>>>>>>>>\n", v, interval_v, current_v, now_time_v);
+						//printf("<<v=%d<<<<<interval_v=%d<<<<<current_v=%d<<<<<<<<：%d：>>>>>>>>>>>>>>>>\n", v, interval_v, current_v, now_time_v);
 						//printf("大于时间间隔内的手数: %d==总手数%d\n", v, now_time_v);
 						if (i == fenshi_i)
 						{
@@ -808,6 +823,8 @@ public:
 						freeReplyObject(reply);
 
 						endTime = max_time;
+
+						upD = true;
 					}
 					/*else
 					{*/
@@ -836,7 +853,7 @@ public:
 							update_v = v - interval_v;
 						}
 
-						printf("小于时间间隔内的手数: %d==总手数%d=v_changeNum=%d--sum_el-%f\n\n", v, update_v, v_changeNum, sum_el);
+						//printf("小于时间间隔内的手数: %d==总手数%d=v_changeNum=%d--sum_el-%f\n\n", v, update_v, v_changeNum, sum_el);
 
 						//更新k线数据（成交量算手数 更新）
 						if (i == fenshi_i)
@@ -853,18 +870,20 @@ public:
 						freeReplyObject(reply);
 
 						//更新记录数据（开盘价，成交量 不更新）相当于k线数据最后一条
-						if (i == fenshi_i)
+						if (!upD)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d,\"sum_el\":%lf,\"v_changeNum\":%d}", el, update_v, interval_v, endTime, sum_el, v_changeNum);
+							if (i == fenshi_i)
+							{
+								sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d,\"sum_el\":%lf,\"v_changeNum\":%d}", el, update_v, interval_v, endTime, sum_el, v_changeNum);
+							}
+							else
+							{
+								sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", current_maxl, current_minl, current_sl, el, update_v, interval_v, endTime);
+							}
+							reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
+							//printf("小于时间间隔哈希表更新记录SET: %s\n\n\n", reply->str);
+							freeReplyObject(reply);
 						}
-						else
-						{
-							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", current_maxl, current_minl, current_sl, el, update_v, interval_v, endTime);
-						}
-						reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
-						//printf("小于时间间隔哈希表更新记录SET: %s\n\n\n", reply->str);
-						freeReplyObject(reply);
-
 					//}
 					free(root);
 				}
