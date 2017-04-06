@@ -501,7 +501,7 @@ public:
 		//暂定只存储4个品种K线
 		if (!(strcmp(pMarketData->InstrumentID, "Ag(T+D)") == 0 ||
 			strcmp(pMarketData->InstrumentID, "Au(T+D)") == 0 ||
-			strcmp(pMarketData->InstrumentID, "Au99.99") == 0 ||
+			strcmp(pMarketData->InstrumentID, "Au100g") == 0 ||
 			strcmp(pMarketData->InstrumentID, "mAu(T+D)") == 0))
 		{
 			return;
