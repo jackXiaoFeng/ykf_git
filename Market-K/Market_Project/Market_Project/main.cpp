@@ -408,7 +408,7 @@ public:
 		contracts[18] = "u(T+D)_Deli";
 		m_pUserApi->SubMarketData(contracts, 19);
 	}
-
+	//输出行情信息
 	void printf_Market(CQdpFtdcDepthMarketDataField *pMarketData)
 	{
 		// 客户端按需处理返回的数据
@@ -724,10 +724,13 @@ public:
 					bool isNextMonth = false;
 
 					int current_v = cJSON_GetObjectItem(root, "v")->valueint;
-					int interval_v = cJSON_GetObjectItem(root, "interval_v")->valueint;
 					int max_time = cJSON_GetObjectItem(root, "dated")->valueint;
-
-					if (i == 10)
+					int interval_v;
+					if (i == fenshi_i)
+					{
+						interval_v = 0;
+					}
+					else if (i == 10)
 					{
 						lt = time_t(max_time);
 						ptr = localtime(&lt);
@@ -749,6 +752,8 @@ public:
 						current_sl = cJSON_GetObjectItem(root, "sl")->valuedouble;
 						current_maxl = current_maxl > el ? current_maxl : el;
 						current_minl = current_minl < el ? current_minl : el;
+
+						interval_v = cJSON_GetObjectItem(root, "interval_v")->valueint;
 					}
 					freeReplyObject(reply);
 
@@ -793,7 +798,7 @@ public:
 						//更新v
 						if (i == fenshi_i)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,,\"turnover\":%lf,\"dated\":%d}", el, v, turnover, endTime);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"turnover\":%lf,\"dated\":%d}", el, v, turnover, endTime);
 						}
 						else
 						{
@@ -849,7 +854,7 @@ public:
 					{
 						if (i == fenshi_i)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,,\"turnover\":%lf,\"dated\":%d}", el, v, turnover, endTime);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"turnover\":%lf,\"dated\":%d}", el, v, turnover, endTime);
 						}
 						else
 						{
@@ -897,7 +902,7 @@ public:
 						//记录值默认 都是LastPrice v 和 interval_v 默认总成交量 endTime默认行情去秒数时间
 						if (i == fenshi_i)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,,\"turnover\":%lf,\"dated\":%d}", el, v, turnover, endTime);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"turnover\":%lf,\"dated\":%d}", el, v, turnover, endTime);
 						}
 						else
 						{
