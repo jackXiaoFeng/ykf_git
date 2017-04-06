@@ -585,6 +585,7 @@ public:
 		double sl = pMarketData->OpenPrice;
 		double el = pMarketData->LastPrice;
 		int v = pMarketData->Volume;
+		double turnover = pMarketData->Turnover;
 
 		//存储信息
 		char myhash[50] = "";
@@ -719,8 +720,6 @@ public:
 					double current_minl;
 					double current_sl;
 
-					double sum_el = 0.0;
-					int v_changeNum = 0;
 					//判断是否是下个月 月k间隔不确定  用月份判断
 					bool isNextMonth = false;
 
@@ -728,13 +727,7 @@ public:
 					int interval_v = cJSON_GetObjectItem(root, "interval_v")->valueint;
 					int max_time = cJSON_GetObjectItem(root, "dated")->valueint;
 
-					if (i == fenshi_i)
-					{
-						//计算分时均线的两个数值
-						sum_el = cJSON_GetObjectItem(root, "sum_el")->valuedouble;
-						v_changeNum = cJSON_GetObjectItem(root, "v_changeNum")->valueint;
-					}
-					else if (i == 10)
+					if (i == 10)
 					{
 						lt = time_t(max_time);
 						ptr = localtime(&lt);
@@ -787,7 +780,8 @@ public:
 						//printf("<<v=%d<<<<<interval_v=%d<<<<<current_v=%d<<<<<<<<：%d：>>>>>>>>>>>>>>>>\n", v, interval_v, current_v, now_time_v);
 						if (i == fenshi_i)
 						{
-							sprintf(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%lf}", el, now_time_v, endTime, el);
+							float el_meanline = turnover / v;
+							sprintf(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%lf}", el, now_time_v, endTime, el_meanline);
 						}
 						else
 						{
@@ -799,7 +793,7 @@ public:
 						//更新v
 						if (i == fenshi_i)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d,\"sum_el\":%lf,\"v_changeNum\":%d}", el, now_time_v, v, endTime, el, 1);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,,\"turnover\":%lf,\"dated\":%d}", el, v, turnover, endTime);
 						}
 						else
 						{
@@ -815,11 +809,6 @@ public:
 					}
 					/*else
 					{*/
-					if (v != (current_v + interval_v) && current_v != interval_v  && i == fenshi_i)
-					{
-						v_changeNum++;
-						sum_el = sum_el + el;
-					}
 					//时间间隔内 update_v = v - interval_v;
 
 					int  update_v;
@@ -845,7 +834,7 @@ public:
 					//更新k线数据（成交量算手数 更新）
 					if (i == fenshi_i)
 					{
-						float el_meanline = sum_el / v_changeNum;
+						float el_meanline = turnover / v;
 						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%f}", el, update_v, endTime, el_meanline);
 					}
 					else
@@ -860,7 +849,7 @@ public:
 					{
 						if (i == fenshi_i)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d,\"sum_el\":%lf,\"v_changeNum\":%d}", el, update_v, interval_v, endTime, sum_el, v_changeNum);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,,\"turnover\":%lf,\"dated\":%d}", el, v, turnover, endTime);
 						}
 						else
 						{
@@ -894,7 +883,8 @@ public:
 						//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
 						if (i == fenshi_i)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%lf}", el, tempV, endTime, el);
+							float el_meanline = turnover / v;
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%lf}", el, tempV, endTime, el_meanline);
 						}
 						else
 						{
@@ -907,7 +897,7 @@ public:
 						//记录值默认 都是LastPrice v 和 interval_v 默认总成交量 endTime默认行情去秒数时间
 						if (i == fenshi_i)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d,\"sum_el\":%lf,\"v_changeNum\":%d}", el, v, v, endTime, el, 1);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,,\"turnover\":%lf,\"dated\":%d}", el, v, turnover, endTime);
 						}
 						else
 						{
