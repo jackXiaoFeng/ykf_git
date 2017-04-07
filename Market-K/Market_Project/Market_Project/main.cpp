@@ -186,7 +186,7 @@ int compare_time_60(int time, int time_interval_local, char marketDate[100])
 		//È¥³ý·ÖÖÓÊý
 		endTime_60 = endTime_60 - int(endTime_60) % int(time_interval_local);
 
-		if (nowTimestamp_Surplus >= 7200 && nowTimestamp_Surplus <= 55800)
+		if (nowTimestamp_Surplus >= 7200 && nowTimestamp_Surplus < 55860)
 		{
 			if (time % (60 * 60) < 1800)
 			{
