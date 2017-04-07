@@ -613,7 +613,7 @@ public:
 			240 * 60,
 			60,
 			24 * 60 * 60,
-			7 * 24 * 60 * 60,
+			8 * 24 * 60 * 60,
 			32 * 24 * 60 * 60
 		};
 
@@ -668,16 +668,22 @@ public:
 			else if (i == 8)
 			{
 				//周 k
-				endTime = get_time_week(r_lt, r_ptr);
+				int endTime_week = get_time_week(r_lt, r_ptr);
 				//根据日成交量 计算今天之前周成交量
 				week_v = get_sum_v(nowDayOfWeek, InstrumentID, MomdayTime);
+
+				//以当前行情时间作为key
+				endTime = r_Market_Updatetimes - (int(r_Market_Updatetimes) + 28800) % int(86400);
 			}
 			else if (i == 9)
 			{
 				//月k
-				endTime = get_time_month(r_lt, r_ptr);
+				int endTime_month = get_time_month(r_lt, r_ptr);
 				//根据日成交量 计算今天之前月成交量
 				month_v = get_sum_v(nowDayOfMonth, InstrumentID, startMonTime);
+
+				//以当前行情时间作为key
+				endTime = r_Market_Updatetimes - (int(r_Market_Updatetimes) + 28800) % int(86400);
 			}
 			else
 			{
@@ -720,8 +726,8 @@ public:
 					double current_minl;
 					double current_sl;
 
-					//判断是否是下个月 月k间隔不确定  用月份判断
-					bool isNextMonth = false;
+					//判断是否是下个周 月k 间隔不确定 判断
+					bool isNext = false;
 
 					int current_v = cJSON_GetObjectItem(root, "v")->valueint;
 					int max_time = cJSON_GetObjectItem(root, "dated")->valueint;
@@ -730,7 +736,22 @@ public:
 					{
 						interval_v = 0;
 					}
-					else if (i == 10)
+					else if (i == 8)
+					{
+						lt = time_t(max_time);
+						ptr = localtime(&lt);
+						int max_Week = ptr->tm_wday + 1;
+
+						lt = time_t(endTime);
+						ptr = localtime(&lt);
+						int end_Week = ptr->tm_wday + 1;
+
+						if (max_Week != end_Week)
+						{
+							isNext = true;
+						}
+					}
+					else if (i == 9)
 					{
 						lt = time_t(max_time);
 						ptr = localtime(&lt);
@@ -742,7 +763,7 @@ public:
 
 						if (max_Month != end_Month)
 						{
-							isNextMonth = true;
+							isNext = true;
 						}
 					}
 					else
@@ -760,7 +781,7 @@ public:
 					//新插入数据 是否要更新记录数据
 					int upDateCurrent = true;
 
-					if (endTime - max_time >= time_interval_local_array[i] || isNextMonth)
+					if (endTime - max_time >= time_interval_local_array[i] || isNext)
 					{
 						int now_time_v = v - interval_v - current_v;
 						//晚8:00 清盘成交量==0；
