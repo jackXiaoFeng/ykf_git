@@ -1,5 +1,9 @@
-﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(1193,5): warning MSB8030: The linker switch "Minimum Required Version" requires "SubSystem" to be set.  Without "SubSystem", the "Minimum Required Version" would not be passed to linker and could prevent to the output binary from running on older Operating Systems.
-  LINK : 没有找到 G:\ykf_git\Market_Project-Oracle\Market_Project-debug-config\Debug\Market_Project.exe 或上一个增量链接没有生成它；正在执行完全链接
+﻿  cJSON.c
+  main.cpp
+  DBOperation.cpp
+  Confi.cpp
+  正在生成代码...
+C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(1193,5): warning MSB8030: The linker switch "Minimum Required Version" requires "SubSystem" to be set.  Without "SubSystem", the "Minimum Required Version" would not be passed to linker and could prevent to the output binary from running on older Operating Systems.
 hiredis.lib(hiredis.obj) : warning LNK4099: 未找到 PDB“hiredis.pdb”(使用“hiredis.lib(hiredis.obj)”或在“G:\ykf_git\Market_Project-Oracle\Market_Project-debug-config\Debug\hiredis.pdb”中寻找)；正在链接对象，如同没有调试信息一样
 hiredis.lib(net.obj) : warning LNK4099: 未找到 PDB“hiredis.pdb”(使用“hiredis.lib(net.obj)”或在“G:\ykf_git\Market_Project-Oracle\Market_Project-debug-config\Debug\hiredis.pdb”中寻找)；正在链接对象，如同没有调试信息一样
 hiredis.lib(sds.obj) : warning LNK4099: 未找到 PDB“hiredis.pdb”(使用“hiredis.lib(sds.obj)”或在“G:\ykf_git\Market_Project-Oracle\Market_Project-debug-config\Debug\hiredis.pdb”中寻找)；正在链接对象，如同没有调试信息一样

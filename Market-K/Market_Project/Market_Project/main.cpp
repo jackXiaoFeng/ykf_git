@@ -883,6 +883,16 @@ public:
 						}
 						reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
 						freeReplyObject(reply);
+
+						//周 月k最后时间戳 需要显示当日时间戳 遇到下周/月 则跳为下周/月 故要删除前一个日时间戳
+						if (i == 8 || i == 9)
+						{
+							if (endTime != max_time)
+							{
+								reply = (redisReply *)redisCommand(rc, "HDEL %s %d", myhash, max_time);
+								freeReplyObject(reply);
+							}
+						}
 					}
 					//}
 					free(root);
