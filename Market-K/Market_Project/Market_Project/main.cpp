@@ -1146,8 +1146,7 @@ int main()
 	strcpy(redis_DomainName, c_redis_DomainName.c_str());
 	redis_Port = c_redis_Port;
 
-	ConnrectionOracle();
-
+	//连接redis
 	ConnrectionRedis();
 
 	// 产生一个CQdpFtdcMduserApi实例
