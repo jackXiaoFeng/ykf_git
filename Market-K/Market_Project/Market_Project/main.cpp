@@ -613,7 +613,7 @@ public:
 			240 * 60,
 			60,
 			24 * 60 * 60,
-			8 * 24 * 60 * 60,
+			3 * 24 * 60 * 60,
 			32 * 24 * 60 * 60
 		};
 
@@ -726,31 +726,39 @@ public:
 					double current_minl;
 					double current_sl;
 
+					double origin_maxl;
+					double origin_minl;
+					double origin_sl;
+					double origin_el;
+					double origin_turnover;
+
+
 					//判断是否是下个周 月k 间隔不确定 判断
 					bool isNext = false;
 
 					int current_v = cJSON_GetObjectItem(root, "v")->valueint;
 					int max_time = cJSON_GetObjectItem(root, "dated")->valueint;
-					int interval_v;
+					int interval_v = 0;
 					if (i == fenshi_i)
 					{
 						interval_v = 0;
+						origin_turnover = cJSON_GetObjectItem(root, "turnover")->valuedouble;
 					}
-					else if (i == 8)
+					/*else if (i == 8)
 					{
-						lt = time_t(max_time);
-						ptr = localtime(&lt);
-						int max_Week = ptr->tm_wday + 1;
+					lt = time_t(max_time);
+					ptr = localtime(&lt);
+					int max_Week = ptr->tm_wday + 1;
 
-						lt = time_t(endTime);
-						ptr = localtime(&lt);
-						int end_Week = ptr->tm_wday + 1;
+					lt = time_t(endTime);
+					ptr = localtime(&lt);
+					int end_Week = ptr->tm_wday + 1;
 
-						if (max_Week != end_Week)
-						{
-							isNext = true;
-						}
+					if (max_Week != end_Week)
+					{
+					isNext = true;
 					}
+					}*/
 					else if (i == 9)
 					{
 						lt = time_t(max_time);
@@ -771,6 +779,12 @@ public:
 						current_maxl = cJSON_GetObjectItem(root, "maxl")->valuedouble;
 						current_minl = cJSON_GetObjectItem(root, "minl")->valuedouble;
 						current_sl = cJSON_GetObjectItem(root, "sl")->valuedouble;
+
+					    origin_maxl = current_maxl;
+					    origin_minl = current_minl;
+					    origin_sl = current_sl;
+					    origin_el = cJSON_GetObjectItem(root, "el")->valuedouble;
+
 						current_maxl = current_maxl > el ? current_maxl : el;
 						current_minl = current_minl < el ? current_minl : el;
 
@@ -838,7 +852,12 @@ public:
 					//时间间隔内 update_v = v - interval_v;
 
 					int  update_v;
-					if (i == 7)
+
+					if (i == fenshi_i)
+					{
+						update_v = v - current_v;
+					}
+					else if (i == 7)
 					{
 						update_v = v;
 					}
@@ -853,20 +872,42 @@ public:
 					else
 					{
 						update_v = v - interval_v;
+						if (update_v < 0)
+						{
+							//换一个交易日 则为上个间隔记录值
+							update_v = current_v;
+						}
 					}
 
 					//printf("小于时间间隔内的手数: %d==总手数%d=v_changeNum=%d--sum_el-%f\n\n", v, update_v, v_changeNum, sum_el);
 
 					//更新k线数据（成交量算手数 更新）
-					if (i == fenshi_i)
+					//有新间隔插入 则除了成交量 其余值全部用原记录值
+					if (upDateCurrent)
 					{
-						float el_meanline = turnover / v;
-						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%f}", el, update_v, endTime, el_meanline);
+						if (i == fenshi_i)
+						{
+							float el_meanline = turnover / v;
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%f}", el, update_v, endTime, el_meanline);
+						}
+						else
+						{
+							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", current_maxl, current_minl, current_sl, el, update_v, endTime);
+						}
 					}
 					else
 					{
-						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", current_maxl, current_minl, current_sl, el, update_v, endTime);
+						if (i == fenshi_i)
+						{
+							float el_meanline = origin_turnover / current_v;
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%f}", origin_el, update_v, endTime, el_meanline);
+						}
+						else
+						{
+							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", origin_maxl, origin_minl, origin_sl, origin_el, update_v, endTime);
+						}
 					}
+					
 					reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, max_time, value);
 					freeReplyObject(reply);
 
