@@ -738,28 +738,29 @@ public:
 
 					int current_v = cJSON_GetObjectItem(root, "v")->valueint;
 					int max_time = cJSON_GetObjectItem(root, "dated")->valueint;
-					int interval_v = 0;
+					int interval_v = cJSON_GetObjectItem(root, "interval_v")->valueint;
+
 					if (i == fenshi_i)
 					{
-						interval_v = 0;
 						origin_turnover = cJSON_GetObjectItem(root, "turnover")->valuedouble;
 					}
-					/*else if (i == 8)
+					else
 					{
-					lt = time_t(max_time);
-					ptr = localtime(&lt);
-					int max_Week = ptr->tm_wday + 1;
+						current_maxl = cJSON_GetObjectItem(root, "maxl")->valuedouble;
+						current_minl = cJSON_GetObjectItem(root, "minl")->valuedouble;
+						current_sl = cJSON_GetObjectItem(root, "sl")->valuedouble;
 
-					lt = time_t(endTime);
-					ptr = localtime(&lt);
-					int end_Week = ptr->tm_wday + 1;
+						origin_maxl = current_maxl;
+						origin_minl = current_minl;
+						origin_sl = current_sl;
+						origin_el = cJSON_GetObjectItem(root, "el")->valuedouble;
 
-					if (max_Week != end_Week)
-					{
-					isNext = true;
+						current_maxl = current_maxl > el ? current_maxl : el;
+						current_minl = current_minl < el ? current_minl : el;
+
 					}
-					}*/
-					else if (i == 9)
+
+					if (i == 9)
 					{
 						lt = time_t(max_time);
 						ptr = localtime(&lt);
@@ -773,22 +774,6 @@ public:
 						{
 							isNext = true;
 						}
-					}
-					else
-					{
-						current_maxl = cJSON_GetObjectItem(root, "maxl")->valuedouble;
-						current_minl = cJSON_GetObjectItem(root, "minl")->valuedouble;
-						current_sl = cJSON_GetObjectItem(root, "sl")->valuedouble;
-
-					    origin_maxl = current_maxl;
-					    origin_minl = current_minl;
-					    origin_sl = current_sl;
-					    origin_el = cJSON_GetObjectItem(root, "el")->valuedouble;
-
-						current_maxl = current_maxl > el ? current_maxl : el;
-						current_minl = current_minl < el ? current_minl : el;
-
-						interval_v = cJSON_GetObjectItem(root, "interval_v")->valueint;
 					}
 					freeReplyObject(reply);
 
@@ -821,7 +806,7 @@ public:
 						if (i == fenshi_i)
 						{
 							float el_meanline = turnover / v;
-							sprintf(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%lf}", el, now_time_v, endTime, el_meanline);
+							sprintf(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, now_time_v, el_meanline, endTime);
 						}
 						else
 						{
@@ -833,7 +818,7 @@ public:
 						//更新v
 						if (i == fenshi_i)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"turnover\":%lf,\"dated\":%d}", el, v, turnover, endTime);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"turnover\":%lf,\"dated\":%d}", el, now_time_v, v, turnover, endTime);
 						}
 						else
 						{
@@ -853,21 +838,17 @@ public:
 
 					int  update_v;
 
-					if (i == fenshi_i)
+					if (i == 7)
 					{
-						update_v = v - current_v;
-					}
-					else if (i == 7)
-					{
-						update_v = v;
+						update_v = upDateCurrent ? v : current_v;
 					}
 					else if (i == 8)
 					{
-						update_v = v + week_v;
+						update_v = upDateCurrent ? v + week_v : current_v;
 					}
 					else if (i == 9)
 					{
-						update_v = v + month_v;
+						update_v = upDateCurrent ? v + month_v : current_v;
 					}
 					else
 					{
@@ -888,7 +869,7 @@ public:
 						if (i == fenshi_i)
 						{
 							float el_meanline = turnover / v;
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%f}", el, update_v, endTime, el_meanline);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%f,\"dated\":%d}", el, update_v, el_meanline, endTime);
 						}
 						else
 						{
@@ -899,15 +880,15 @@ public:
 					{
 						if (i == fenshi_i)
 						{
-							float el_meanline = origin_turnover / current_v;
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%f}", origin_el, update_v, endTime, el_meanline);
+							float el_meanline = origin_turnover / (current_v + interval_v);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%f,\"dated\":%d}", origin_el, update_v, el_meanline, endTime);
 						}
 						else
 						{
 							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", origin_maxl, origin_minl, origin_sl, origin_el, update_v, endTime);
 						}
 					}
-					
+
 					reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, max_time, value);
 					freeReplyObject(reply);
 
@@ -916,7 +897,7 @@ public:
 					{
 						if (i == fenshi_i)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"turnover\":%lf,\"dated\":%d}", el, v, turnover, endTime);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"turnover\":%lf,\"dated\":%d}", el, update_v, interval_v, turnover, endTime);
 						}
 						else
 						{
@@ -961,7 +942,7 @@ public:
 						if (i == fenshi_i)
 						{
 							float el_meanline = turnover / v;
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"dated\":%d,\"el_meanline\":%lf}", el, tempV, endTime, el_meanline);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, tempV, el_meanline, endTime);
 						}
 						else
 						{
@@ -974,7 +955,7 @@ public:
 						//记录值默认 都是LastPrice v 和 interval_v 默认总成交量 endTime默认行情去秒数时间
 						if (i == fenshi_i)
 						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"turnover\":%lf,\"dated\":%d}", el, v, turnover, endTime);
+							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"turnover\":%lf,\"dated\":%d}", el, v, v, turnover, endTime);
 						}
 						else
 						{
