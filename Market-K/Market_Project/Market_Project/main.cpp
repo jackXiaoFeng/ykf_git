@@ -380,6 +380,18 @@ public:
 		printf("ErrorCode=[%d], ErrorMsg=[%s]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg);
 		printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
 
+		//登录日志
+		char nowtDate[100] = "";
+		struct tm *ptr;
+		time_t lt = time(NULL);
+		ptr = localtime(&lt);
+		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d %H:%M:%S ", ptr);
+		int now = time(NULL);
+		char value[200] = "";
+		sprintf(value, "{\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+		reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", "k_tcp_login_Log", now, value);
+		freeReplyObject(reply);
+
 		if (pRspInfo->ErrorID != 0)
 		{
 			// 端登失败，客户端需进行错误处理
@@ -506,10 +518,6 @@ public:
 		{
 			return;
 		}
-		else
-		{
-			//printf("pMarketData->InstrumentID=%s\n\n", pMarketData->InstrumentID);
-		}
 
 		//行情更新时间为  本地日期年月日 拼接行情时分秒
 		char nowtDate[100] = "";
@@ -569,6 +577,16 @@ public:
 			return;
 		}
 
+		//是否是停盘最后一分钟
+		bool isLastMinutes = false;
+		if ((nowTimestamp_Surplus >= 9000 && nowTimestamp_Surplus < 9060) ||
+			(nowTimestamp_Surplus >= 41400 && nowTimestamp_Surplus < 41460) ||
+			(nowTimestamp_Surplus >= 55800 && nowTimestamp_Surplus < 55860))
+		{
+			//特殊收盘时间k线不加间隔
+			isLastMinutes = true;
+		}
+
 		//合约标示去除多余字符 并转成大写字符
 		char origin_InstrumentID[31] = "";
 		strcpy(origin_InstrumentID, pMarketData->InstrumentID);
@@ -620,11 +638,6 @@ public:
 		char name[30] = "";
 		int time_interval_local;
 
-		/*bool isHalfHour;
-		char h_m[30] = "";
-		/*char week[30] = "";
-		stamp_to_standard(market_Updatetimes, h_m, week);*/
-
 		lt = time_t(market_Updatetimes);
 		ptr = localtime(&lt);
 
@@ -638,13 +651,13 @@ public:
 		int ss1 = int(r_Market_Updatetimes) % int(60);
 		r_Market_Updatetimes = r_Market_Updatetimes - ss1;
 
-		int endTime;
+		int r_TempTime = r_Market_Updatetimes - (int(r_Market_Updatetimes) + 28800) % int(86400);
+
+		int endTime = 0;
 		int fenshi_i = 6;//判断分时
 		int len = sizeof(nameArray) / sizeof(char*);
 		for (int i = 0; i < len; ++i)
 		{
-			endTime = 0;
-
 			//设定k线名字和时间间隔
 			strcpy(name, nameArray[i]);
 			sprintf_s(myhash, "%s_%s", InstrumentID, name);
@@ -663,7 +676,7 @@ public:
 			else if (i == 7)
 			{
 				//日 K
-				endTime = r_Market_Updatetimes - (int(r_Market_Updatetimes) + 28800) % int(86400);
+				endTime = r_TempTime;
 			}
 			else if (i == 8)
 			{
@@ -673,7 +686,7 @@ public:
 				week_v = get_sum_v(nowDayOfWeek, InstrumentID, MomdayTime);
 
 				//以当前行情时间作为key
-				endTime = r_Market_Updatetimes - (int(r_Market_Updatetimes) + 28800) % int(86400);
+				endTime = r_TempTime;
 			}
 			else if (i == 9)
 			{
@@ -683,23 +696,15 @@ public:
 				month_v = get_sum_v(nowDayOfMonth, InstrumentID, startMonTime);
 
 				//以当前行情时间作为key
-				endTime = r_Market_Updatetimes - (int(r_Market_Updatetimes) + 28800) % int(86400);
+				endTime = r_TempTime;
 			}
 			else
 			{
 				// 1 5 15 30
 				time_interval_local = time_interval_local_array[i];
-				if ((nowTimestamp_Surplus >= 9000 && nowTimestamp_Surplus < 9060) ||
-					(nowTimestamp_Surplus >= 41400 && nowTimestamp_Surplus < 41460) ||
-					(nowTimestamp_Surplus >= 55800 && nowTimestamp_Surplus < 55860))
-				{
-					//特殊收盘时间k线不加间隔
-					endTime = market_Updatetimes;
-				}
-				else
-				{
-					endTime = market_Updatetimes + time_interval_local;
-				}
+				
+				int local = isLastMinutes ? 0 : time_interval_local;
+				endTime = market_Updatetimes + local;
 				endTime = endTime - int(endTime) % int(time_interval_local);
 			}
 
@@ -757,7 +762,6 @@ public:
 
 						current_maxl = current_maxl > el ? current_maxl : el;
 						current_minl = current_minl < el ? current_minl : el;
-
 					}
 
 					if (i == 9)

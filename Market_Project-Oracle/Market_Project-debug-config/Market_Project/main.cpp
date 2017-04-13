@@ -358,6 +358,18 @@ public:
 		printf("ErrorCode=[%d], ErrorMsg=[%s]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg);
 		printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
 
+		//登录日志
+		char nowtDate[100] = "";
+		struct tm *ptr;
+		time_t lt = time(NULL);
+		ptr = localtime(&lt);
+		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d %H:%M:%S ", ptr);
+		int now = time(NULL);
+		char value[200] = "";
+		sprintf(value, "{\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+		reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", "hq_tcp_login_Log", now, value);
+		freeReplyObject(reply);
+
 		if (pRspInfo->ErrorID != 0)
 		{
 			// 端登失败，客户端需进行错误处理
