@@ -524,6 +524,13 @@ public:
 		strcat(market_time_str, time_hms);
 		int market_Updatetimes = (int)StringToDatetime(market_time_str);
 
+		//因行情时间有延迟 故在23:59:59秒 拼接的时候会出现本地日期已经过一天 行情时间还是上一天的bug 所以判断如果行情时间戳大于本地时间戳和大于不只一秒条件 就减去一个交易日
+		int now = (int)lt;
+		if (market_Updatetimes > now && (market_Updatetimes - now) > 60)
+		{
+			market_Updatetimes -= 24 * 60 * 60;
+		}
+
 		//合约标示去除多余字符 并转成大写字符
 		char origin_InstrumentID[31] = "";
 		strcpy(origin_InstrumentID, pMarketData->InstrumentID);

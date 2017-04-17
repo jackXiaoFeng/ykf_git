@@ -142,7 +142,7 @@ void DatetimeToString(time_t time)
 	strftime(dateTime, sizeof(dateTime), "%Y-%m-%d %H:%M:%S", p);
 }
 
-void stamp_to_standard(int stampTime, char a[100], char week[100])
+void stamp_to_standard(int stampTime, char *a, char *week)
 {
 	time_t tick = (time_t)stampTime;
 	struct tm tm;
@@ -160,7 +160,7 @@ void stamp_to_standard(int stampTime, char a[100], char week[100])
 	strcpy(week, w);
 }
 
-int compare_time_60(int time, int time_interval_local, char marketDate[100])
+int compare_time_60(int time, int time_interval_local, char *marketDate)
 {
 	int endTime_60;
 	char s[100];
@@ -201,7 +201,7 @@ int compare_time_60(int time, int time_interval_local, char marketDate[100])
 	return endTime_60;
 }
 
-int compare_time_240(char marketDate[100])
+int compare_time_240(char *marketDate)
 {
 	int endTime_240;
 	char s[100];
@@ -280,7 +280,7 @@ int get_time_month(time_t lt, tm *ptr)
 }
 
 // 获取时间段的成交量
-int get_sum_v(int num, char InstrumentID[30], int time)
+int get_sum_v(int num, char *InstrumentID, int time)
 {
 	int sum = 0;
 	char tempName[100] = "";
@@ -322,7 +322,7 @@ char* substring(char* ch, int pos, int length)
 }
 
 //删除特殊字符  || 替换其他特殊字符
-void delAndReplace(char str[], char d[], char oldChar, char newChar)
+void delAndReplace(char *str, char *d, char oldChar, char newChar)
 {
 	int i = 0, j = 0;
 	while (str[i] != '\0')
@@ -381,7 +381,7 @@ public:
 		printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
 
 		//登录日志
-		char nowtDate[100] = "";
+		char nowtDate[30] = "";
 		struct tm *ptr;
 		time_t lt = time(NULL);
 		ptr = localtime(&lt);
@@ -520,7 +520,7 @@ public:
 		}
 
 		//行情更新时间为  本地日期年月日 拼接行情时分秒
-		char nowtDate[100] = "";
+		char nowtDate[30] = "";
 		char marketDate[100] = "";
 		char market_time_str[100] = "";
 		char r_Market_time_str[100] = "";
@@ -539,6 +539,12 @@ public:
 		strcat(market_time_str, time_hms);
 		int market_Updatetimes = (int)StringToDatetime(market_time_str);
 
+		//因行情时间有延迟 故在23:59:59秒 拼接的时候会出现本地日期已经过一天 行情时间还是上一天的bug 所以判断如果行情时间戳大于本地时间戳和大于不只一秒条件 就减去一个交易日
+		int now = (int)lt;
+		if (market_Updatetimes > now && (market_Updatetimes - now) > 60)
+		{
+			market_Updatetimes -= 24 * 60 * 60;
+		}
 
 		//行情日期+行情时分秒 用于计算日/周/月k
 		struct tm *r_ptr;
@@ -744,6 +750,13 @@ public:
 					int current_v = cJSON_GetObjectItem(root, "v")->valueint;
 					int max_time = cJSON_GetObjectItem(root, "dated")->valueint;
 					int interval_v = cJSON_GetObjectItem(root, "interval_v")->valueint;
+					origin_el = cJSON_GetObjectItem(root, "el")->valuedouble;
+
+					//收盘价为零 就把上一个收盘价赋值给收盘价 
+					if (el == 0.0)
+					{
+						el = origin_el;
+					}
 
 					if (i == fenshi_i)
 					{
@@ -758,7 +771,6 @@ public:
 						origin_maxl = current_maxl;
 						origin_minl = current_minl;
 						origin_sl = current_sl;
-						origin_el = cJSON_GetObjectItem(root, "el")->valuedouble;
 
 						current_maxl = current_maxl > el ? current_maxl : el;
 						current_minl = current_minl < el ? current_minl : el;
