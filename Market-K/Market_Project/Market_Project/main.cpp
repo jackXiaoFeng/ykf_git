@@ -521,10 +521,10 @@ public:
 
 		//行情更新时间为  本地日期年月日 拼接行情时分秒
 		char nowtDate[30] = "";
-		char marketDate[100] = "";
-		char market_time_str[100] = "";
-		char r_Market_time_str[100] = "";
-		char time_hms[30] = "";
+		char marketDate[12] = "";
+		char market_time_str[30] = "";
+		char r_Market_time_str[30] = "";
+		char time_hms[9] = "";
 
 		struct tm *ptr;
 		time_t lt;
@@ -546,15 +546,25 @@ public:
 			market_Updatetimes -= 24 * 60 * 60;
 		}
 
+
 		//行情日期+行情时分秒 用于计算日/周/月k
-		struct tm *r_ptr;
-		time_t r_lt;
+		int r_Market_Updatetimes;
 		strcpy(marketDate, pMarketData->TradingDay);
 		sprintf_s(marketDate, "%s-%s-%s", substring(marketDate, 0, 4), substring(marketDate, 4, 2), substring(marketDate, 6, 2));
-		strcpy(r_Market_time_str, marketDate);
-		strcat(r_Market_time_str, " ");
-		strcat(r_Market_time_str, time_hms);
-		int r_Market_Updatetimes = (int)StringToDatetime(r_Market_time_str);
+
+		if (strcmp(marketDate, market_time_str) != 0)
+		{
+			strcpy(r_Market_time_str, marketDate);
+			strcat(r_Market_time_str, " ");
+			strcat(r_Market_time_str, time_hms);
+		    r_Market_Updatetimes = (int)StringToDatetime(r_Market_time_str);
+		}
+		else
+		{
+			r_Market_Updatetimes = market_Updatetimes;
+		}
+		struct tm *r_ptr;
+		time_t r_lt;
 
 		//9:00-11:30 13:30-15:30 20:00-24:00 00:00-02:00
 		/*#20:00 = 72000,
@@ -566,8 +576,8 @@ public:
 		*/
 		//根据行情更新时间来确定是否是在开盘价之内 是否存redis
 		int dds = market_Updatetimes;
-		nowTimestamp_Zero = dds - (int(dds) + 28800) % int(86400);
 		nowTimestamp_Surplus = (int(dds) + 28800) % int(86400);
+		nowTimestamp_Zero = dds - nowTimestamp_Surplus;
 
 		//停盘时间加一分钟 是为了结束时30:00减去前一个时间段 算出成交量
 		if ((nowTimestamp_Surplus > 72000 || nowTimestamp_Surplus < 9060) ||
