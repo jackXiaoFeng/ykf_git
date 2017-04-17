@@ -163,7 +163,7 @@ void stamp_to_standard(int stampTime, char *a, char *week)
 int compare_time_60(int time, int time_interval_local, char *marketDate)
 {
 	int endTime_60;
-	char s[100];
+	char s[30];
 	if (nowTimestamp_Surplus >= 7200 && nowTimestamp_Surplus < 9060)
 	{
 		sprintf_s(s, "%s %s", marketDate, "09:30:00");
@@ -204,7 +204,7 @@ int compare_time_60(int time, int time_interval_local, char *marketDate)
 int compare_time_240(char *marketDate)
 {
 	int endTime_240;
-	char s[100];
+	char s[30];
 
 	//00:00 10:30 15:30 00:00
 	if (nowTimestamp_Surplus >= 0 && nowTimestamp_Surplus < 37800)
@@ -226,7 +226,7 @@ int compare_time_240(char *marketDate)
 
 int get_time_week(time_t lt, tm *ptr)
 {
-	int endTime_week;
+	//int endTime_week;
 	//00:00 10:30 15:30 00:00
 	nowDayOfWeek = 0;
 	MomdayTime = 0;
@@ -241,42 +241,42 @@ int get_time_week(time_t lt, tm *ptr)
 	MomdayTime = nowTime - nowDayOfWeek * 24 * 60 * 60;
 
 	//周五 
-	int SaturdayTime = MomdayTime + 4 * 24 * 60 * 60;
+	//int SaturdayTime = MomdayTime + 4 * 24 * 60 * 60;
 
 	//如果是周六则算为下周
-	char week[20] = "";
+	/*char week[20] = "";
 	strftime(week, sizeof(week), "%A", ptr);
 	if (strcmp(week, "Saturday") == 0)
 	{
 		SaturdayTime = SaturdayTime + 7 * 24 * 60 * 60;
 	}
-	endTime_week = SaturdayTime - (int(SaturdayTime) + 28800) % int(86400);
+	endTime_week = SaturdayTime - (int(SaturdayTime) + 28800) % int(86400);*/
 
 	MomdayTime = MomdayTime - (int(MomdayTime) + 28800) % int(86400);
 
-	return endTime_week;
+	return MomdayTime;
 }
 
-int get_time_month(time_t lt, tm *ptr)
+int get_time_month(tm *ptr)
 {
-	int endTime_month;
+	//int endTime_month;
 	nowDayOfMonth = 0;
 	startMonTime = 0;
 	//月k
-	char jointDate[50] = "";
+	char jointDate[30] = "";
 	int mday = ptr->tm_mday;
 	nowDayOfMonth = mday - 1; //今天是本月的第几天。1-31
 							  //月初
 	sprintf_s(jointDate, "%d-%d-%d %d:%d:%d", ptr->tm_year + 1900, ptr->tm_mon + 1, 1, 0, 0, 0);
-	startMonTime = StringToDatetime(jointDate);
+	startMonTime = (int)StringToDatetime(jointDate);
 
 	//月末
-	sprintf_s(jointDate, "%d-%d-%d %d:%d:%d", ptr->tm_year + 1900, ptr->tm_mon + 1 + 1, 1, 0, 0, 0);
+	/*sprintf_s(jointDate, "%d-%d-%d %d:%d:%d", ptr->tm_year + 1900, ptr->tm_mon + 1 + 1, 1, 0, 0, 0);
 	int endMon = StringToDatetime(jointDate);
 	endMon = endMon - 24 * 60 * 60;
-	endTime_month = endMon - (int(endMon) + 28800) % int(86400);
+	endTime_month = endMon - (int(endMon) + 28800) % int(86400);*/
 
-	return endTime_month;
+	return startMonTime;
 }
 
 // 获取时间段的成交量
@@ -386,7 +386,7 @@ public:
 		time_t lt = time(NULL);
 		ptr = localtime(&lt);
 		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d %H:%M:%S ", ptr);
-		int now = time(NULL);
+		int now = (int)time(NULL );
 		char value[200] = "";
 		sprintf(value, "{\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 		reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", "k_tcp_login_Log", now, value);
@@ -510,6 +510,7 @@ public:
 		//输出行情
 		//printf_Market(pMarketData);
 
+		int grammage = 1;
 		//暂定只存储4个品种K线
 		if (!(strcmp(pMarketData->InstrumentID, "Ag(T+D)") == 0 ||
 			strcmp(pMarketData->InstrumentID, "Au(T+D)") == 0 ||
@@ -517,6 +518,21 @@ public:
 			strcmp(pMarketData->InstrumentID, "mAu(T+D)") == 0))
 		{
 			return;
+		}
+		else
+		{
+			if (strcmp(pMarketData->InstrumentID, "Ag(T+D)") == 0)
+			{
+				grammage = 1;
+			}
+			else if (strcmp(pMarketData->InstrumentID, "Au(T+D)") == 0)
+			{
+				grammage = 1000;
+			}
+			else 
+			{
+				grammage = 100;
+			}			
 		}
 
 		//行情更新时间为  本地日期年月日 拼接行情时分秒
@@ -581,8 +597,8 @@ public:
 
 		//停盘时间加一分钟 是为了结束时30:00减去前一个时间段 算出成交量
 		if ((nowTimestamp_Surplus > 72000 || nowTimestamp_Surplus < 9060) ||
-			(nowTimestamp_Surplus >32400 & nowTimestamp_Surplus < 41460) ||
-			(nowTimestamp_Surplus >48600 & nowTimestamp_Surplus < 55860))
+			(nowTimestamp_Surplus >32400 && nowTimestamp_Surplus < 41460) ||
+			(nowTimestamp_Surplus >48600 && nowTimestamp_Surplus < 55860))
 		{
 			//printf("开盘时间");
 		}
@@ -664,25 +680,26 @@ public:
 		int ss = int(market_Updatetimes) % int(60);
 		market_Updatetimes = market_Updatetimes - ss;
 
-		int ss1 = int(r_Market_Updatetimes) % int(60);
-		r_Market_Updatetimes = r_Market_Updatetimes - ss1;
+		r_Market_Updatetimes = r_Market_Updatetimes - ss;
 
 		int r_TempTime = r_Market_Updatetimes - (int(r_Market_Updatetimes) + 28800) % int(86400);
 
 		int endTime = 0;
 		int fenshi_i = 6;//判断分时
-		int len = sizeof(nameArray) / sizeof(char*);
-		for (int i = 0; i < len; ++i)
+		//int len = sizeof(nameArray) / sizeof(char*);
+		for (int i = 0; i < 10; ++i)
 		{
 			//设定k线名字和时间间隔
 			strcpy(name, nameArray[i]);
 			sprintf_s(myhash, "%s_%s", InstrumentID, name);
 			sprintf_s(myhash_v, "%s_%s_%s", InstrumentID, name, "CurrentV");
+			time_interval_local = time_interval_local_array[i];
+
 
 			if (i == 4)
 			{
 				//60分钟 K
-				endTime = compare_time_60(market_Updatetimes, time_interval_local_array[i], marketDate);
+				endTime = compare_time_60(market_Updatetimes, time_interval_local, marketDate);
 			}
 			else if (i == 5)
 			{
@@ -697,9 +714,9 @@ public:
 			else if (i == 8)
 			{
 				//周 k
-				int endTime_week = get_time_week(r_lt, r_ptr);
+				int st = get_time_week(r_lt, r_ptr);
 				//根据日成交量 计算今天之前周成交量
-				week_v = get_sum_v(nowDayOfWeek, InstrumentID, MomdayTime);
+				week_v = get_sum_v(nowDayOfWeek, InstrumentID, st);
 
 				//以当前行情时间作为key
 				endTime = r_TempTime;
@@ -707,9 +724,9 @@ public:
 			else if (i == 9)
 			{
 				//月k
-				int endTime_month = get_time_month(r_lt, r_ptr);
+				int st = get_time_month(r_ptr);
 				//根据日成交量 计算今天之前月成交量
-				month_v = get_sum_v(nowDayOfMonth, InstrumentID, startMonTime);
+				month_v = get_sum_v(nowDayOfMonth, InstrumentID, st);
 
 				//以当前行情时间作为key
 				endTime = r_TempTime;
@@ -717,8 +734,6 @@ public:
 			else
 			{
 				// 1 5 15 30
-				time_interval_local = time_interval_local_array[i];
-				
 				int local = isLastMinutes ? 0 : time_interval_local;
 				endTime = market_Updatetimes + local;
 				endTime = endTime - int(endTime) % int(time_interval_local);
@@ -786,7 +801,7 @@ public:
 						current_minl = current_minl < el ? current_minl : el;
 					}
 
-					if (i == 9)
+					if (i == 9 && max_time != endTime)
 					{
 						lt = time_t(max_time);
 						ptr = localtime(&lt);
@@ -806,7 +821,7 @@ public:
 					//新插入数据 是否要更新记录数据
 					int upDateCurrent = true;
 
-					if (endTime - max_time >= time_interval_local_array[i] || isNext)
+					if (endTime - max_time >= time_interval_local || isNext)
 					{
 						int now_time_v = v - interval_v - current_v;
 						//晚8:00 清盘成交量==0；
@@ -831,7 +846,7 @@ public:
 						//printf("<<v=%d<<<<<interval_v=%d<<<<<current_v=%d<<<<<<<<：%d：>>>>>>>>>>>>>>>>\n", v, interval_v, current_v, now_time_v);
 						if (i == fenshi_i)
 						{
-							float el_meanline = turnover / v;
+							float el_meanline = (float)turnover / (v*grammage);
 							sprintf(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, now_time_v, el_meanline, endTime);
 						}
 						else
@@ -857,13 +872,14 @@ public:
 						endTime = max_time;
 						//不更新记录值
 						upDateCurrent = false;
+
+
 					}
 					/*else
 					{*/
 					//时间间隔内 update_v = v - interval_v;
 
 					int  update_v;
-
 					if (i == 7)
 					{
 						update_v = upDateCurrent ? v : current_v;
@@ -894,7 +910,7 @@ public:
 					{
 						if (i == fenshi_i)
 						{
-							float el_meanline = turnover / v;
+							float el_meanline = (float)turnover / (v*grammage);
 							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%f,\"dated\":%d}", el, update_v, el_meanline, endTime);
 						}
 						else
@@ -906,7 +922,7 @@ public:
 					{
 						if (i == fenshi_i)
 						{
-							float el_meanline = origin_turnover / (current_v + interval_v);
+							float el_meanline = (float)origin_turnover / ((current_v + interval_v)*grammage);
 							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%f,\"dated\":%d}", origin_el, update_v, el_meanline, endTime);
 						}
 						else
@@ -967,7 +983,7 @@ public:
 						//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
 						if (i == fenshi_i)
 						{
-							float el_meanline = turnover / v;
+							float el_meanline = (float)turnover / (v*grammage);
 							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, tempV, el_meanline, endTime);
 						}
 						else
