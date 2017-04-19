@@ -373,6 +373,7 @@ public:
 	{
 		// 当发生这个情况后，API会自动重新连接，客户端可不做处理
 		printf("OnFrontDisconnected.\n");
+
 	}
 
 	// 当客户端发出登录请求之后，该方法会被调用，通知客户端登录是否成功
@@ -536,20 +537,6 @@ public:
 		//输出行情
 		//printf_Market(pMarketData);
 
-		int grammage = 1;
-		if (strcmp(pMarketData->InstrumentID, "Ag(T+D)") == 0)
-		{
-			grammage = 1;
-		}
-		else if (strcmp(pMarketData->InstrumentID, "Au(T+D)") == 0)
-		{
-			grammage = 1000;
-		}
-		else
-		{
-			grammage = 100;
-		}
-			
 		//行情更新时间为  本地日期年月日 拼接行情时分秒
 		char nowtDate[30] = "";
 		char marketDate[12] = "";
@@ -582,7 +569,7 @@ public:
 		strcpy(marketDate, pMarketData->TradingDay);
 		sprintf_s(marketDate, "%s-%s-%s", substring(marketDate, 0, 4), substring(marketDate, 4, 2), substring(marketDate, 6, 2));
 
-		if (strcmp(marketDate, market_time_str) != 0)
+		if (strcmp(marketDate, nowtDate) != 0)
 		{
 			strcpy(r_Market_time_str, marketDate);
 			strcat(r_Market_time_str, " ");
@@ -635,11 +622,34 @@ public:
 
 		//合约标示去除多余字符 并转成大写字符
 		char origin_InstrumentID[31] = "";
-		strcpy(origin_InstrumentID, pMarketData->InstrumentID);
 		char InstrumentID[30] = "";
-		char d[5] = { '(', ')', '+' };
+		strcpy(origin_InstrumentID, pMarketData->InstrumentID);
+		/*char d[5] = { '(', ')', '+' };
 		delAndReplace(origin_InstrumentID, d, '.', '_');
-		strcpy(InstrumentID, origin_InstrumentID);
+		strcpy(InstrumentID, origin_InstrumentID);*/
+
+
+		int grammage = 1;
+		if (strcmp(origin_InstrumentID, "Au(T+D)") == 0)
+		{
+			grammage = 1000;
+			strcpy(InstrumentID, "AUTD");
+		}
+		else if (strcmp(origin_InstrumentID, "Ag(T+D)") == 0)
+		{
+			strcpy(InstrumentID, "AGTD");
+		}
+		else if (strcmp(origin_InstrumentID, "Au100g") == 0)
+		{
+			grammage = 100;
+			strcpy(InstrumentID, "AU100G");
+		}
+		else if (strcmp(origin_InstrumentID, "mAu(T+D)") == 0)
+		{
+			grammage = 100;
+			strcpy(InstrumentID, "MAUTD");
+		}
+
 
 		printf("%sK线种类：%s拼接时间：%s时间戳：%d==\n", prefix, InstrumentID, time_hms, market_Updatetimes);
 
