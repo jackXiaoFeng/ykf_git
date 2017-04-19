@@ -18,6 +18,8 @@
 
 #include "Config.h"
 
+#define prefix ""
+
 #define NO_QFORKIMPL //这一行必须加才能正常使用
 
 #pragma comment(lib,"hiredis.lib")
@@ -80,7 +82,7 @@ void ConnrectionRedis()
 	}
 	else
 	{
-		printf("连接redis成功!\n");
+		printf("%s连接redis成功!\n", prefix);
 	}
 	//freeReplyObject(reply);
 
@@ -248,7 +250,7 @@ int get_time_week(time_t lt, tm *ptr)
 	strftime(week, sizeof(week), "%A", ptr);
 	if (strcmp(week, "Saturday") == 0)
 	{
-		SaturdayTime = SaturdayTime + 7 * 24 * 60 * 60;
+	SaturdayTime = SaturdayTime + 7 * 24 * 60 * 60;
 	}
 	endTime_week = SaturdayTime - (int(SaturdayTime) + 28800) % int(86400);*/
 
@@ -386,10 +388,12 @@ public:
 		time_t lt = time(NULL);
 		ptr = localtime(&lt);
 		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d %H:%M:%S ", ptr);
-		int now = (int)time(NULL );
+		int now = (int)time(NULL);
 		char value[200] = "";
-		sprintf(value, "{\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
-		reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", "k_tcp_login_Log", now, value);
+		sprintf(value, "{\"%sdate\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", prefix, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+		char name[30];
+		sprintf(name, "%sk_tcp_login_Log", prefix);
+		reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", name, now, value);
 		freeReplyObject(reply);
 
 		if (pRspInfo->ErrorID != 0)
@@ -398,7 +402,7 @@ public:
 			printf("Failed to login, errorcode=%d errormsg=%s requestid=%d chain=%d", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 			return;
 		}
-		char * contracts[19] = { "","","" ,"" ,"","","","","","","","","","","","","","","" };
+		/*char * contracts[19] = { "","","" ,"" ,"","","","","","","","","","","","","","","" };
 		contracts[0] = "g(T+D)_deil";
 		contracts[1] = "Au(T+D)";
 		contracts[2] = "Ag(T+D)";
@@ -418,7 +422,29 @@ public:
 		contracts[16] = "iAu99.99";
 		contracts[17] = "mAu(T+D)";
 		contracts[18] = "u(T+D)_Deli";
-		m_pUserApi->SubMarketData(contracts, 19);
+		m_pUserApi->SubMarketData(contracts, 19);*/
+
+		char * contracts[4] = { "","","" ,"" };
+		//contracts[0] = "g(T+D)_deil";
+		contracts[0] = "Au(T+D)";
+		contracts[1] = "Ag(T+D)";
+		//contracts[3] = "u(T+D)_deil";
+		//contracts[4] = "au(T+N1)";
+		//contracts[5] = "(T+N1)_Deli";
+		//contracts[6] = "au(T+N2)";
+		//contracts[7] = "(T+N2)_Deli";
+		contracts[2] = "Au100g";
+		//contracts[9] = "Au50g";
+		//contracts[10] = "Au99.5";
+		//contracts[11] = "Au99.95";
+		//contracts[12] = "Au99.99";
+		//contracts[13] = "Pt99.95";
+		//contracts[14] = "iAu100g";
+		//contracts[15] = "iAu99.5";
+		//contracts[16] = "iAu99.99";
+		contracts[3] = "mAu(T+D)";
+		//contracts[18] = "u(T+D)_Deli";
+		m_pUserApi->SubMarketData(contracts, 4);
 	}
 	//输出行情信息
 	void printf_Market(CQdpFtdcDepthMarketDataField *pMarketData)
@@ -511,30 +537,19 @@ public:
 		//printf_Market(pMarketData);
 
 		int grammage = 1;
-		//暂定只存储4个品种K线
-		if (!(strcmp(pMarketData->InstrumentID, "Ag(T+D)") == 0 ||
-			strcmp(pMarketData->InstrumentID, "Au(T+D)") == 0 ||
-			strcmp(pMarketData->InstrumentID, "Au100g") == 0 ||
-			strcmp(pMarketData->InstrumentID, "mAu(T+D)") == 0))
+		if (strcmp(pMarketData->InstrumentID, "Ag(T+D)") == 0)
 		{
-			return;
+			grammage = 1;
+		}
+		else if (strcmp(pMarketData->InstrumentID, "Au(T+D)") == 0)
+		{
+			grammage = 1000;
 		}
 		else
 		{
-			if (strcmp(pMarketData->InstrumentID, "Ag(T+D)") == 0)
-			{
-				grammage = 1;
-			}
-			else if (strcmp(pMarketData->InstrumentID, "Au(T+D)") == 0)
-			{
-				grammage = 1000;
-			}
-			else 
-			{
-				grammage = 100;
-			}			
+			grammage = 100;
 		}
-
+			
 		//行情更新时间为  本地日期年月日 拼接行情时分秒
 		char nowtDate[30] = "";
 		char marketDate[12] = "";
@@ -562,7 +577,6 @@ public:
 			market_Updatetimes -= 24 * 60 * 60;
 		}
 
-
 		//行情日期+行情时分秒 用于计算日/周/月k
 		int r_Market_Updatetimes;
 		strcpy(marketDate, pMarketData->TradingDay);
@@ -573,7 +587,7 @@ public:
 			strcpy(r_Market_time_str, marketDate);
 			strcat(r_Market_time_str, " ");
 			strcat(r_Market_time_str, time_hms);
-		    r_Market_Updatetimes = (int)StringToDatetime(r_Market_time_str);
+			r_Market_Updatetimes = (int)StringToDatetime(r_Market_time_str);
 		}
 		else
 		{
@@ -627,7 +641,7 @@ public:
 		delAndReplace(origin_InstrumentID, d, '.', '_');
 		strcpy(InstrumentID, origin_InstrumentID);
 
-		printf("K线种类：%s拼接时间：%s时间戳：%d==\n", InstrumentID, time_hms, market_Updatetimes);
+		printf("%sK线种类：%s拼接时间：%s时间戳：%d==\n", prefix, InstrumentID, time_hms, market_Updatetimes);
 
 		//定义并赋值，存储redis行情信息
 		double maxl = pMarketData->HighestPrice;
@@ -686,13 +700,13 @@ public:
 
 		int endTime = 0;
 		int fenshi_i = 6;//判断分时
-		//int len = sizeof(nameArray) / sizeof(char*);
+						 //int len = sizeof(nameArray) / sizeof(char*);
 		for (int i = 0; i < 10; ++i)
 		{
 			//设定k线名字和时间间隔
 			strcpy(name, nameArray[i]);
-			sprintf_s(myhash, "%s_%s", InstrumentID, name);
-			sprintf_s(myhash_v, "%s_%s_%s", InstrumentID, name, "CurrentV");
+			sprintf_s(myhash, "%s%s_%s", prefix, InstrumentID, name);
+			sprintf_s(myhash_v, "%s%s_%s_%s", prefix, InstrumentID, name, "CurrentV");
 			time_interval_local = time_interval_local_array[i];
 
 
@@ -1019,11 +1033,10 @@ public:
 		char detailName[30] = "fenshi_1_minutes_detail";
 
 		char detail_myhash[50];
-		sprintf_s(detail_myhash, "%s_%s", InstrumentID, detailName);
+		sprintf_s(detail_myhash, "%s%s_%s", prefix, InstrumentID, detailName);
 
 		reply = (redisReply *)redisCommand(rc, "HKEYS %s", detail_myhash);
 		//printf("=========HKEYS: %d\n", reply->elements);
-
 		if (reply &&  reply->elements>0) {
 
 			int max_time;

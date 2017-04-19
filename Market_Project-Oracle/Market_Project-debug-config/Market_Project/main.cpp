@@ -693,7 +693,7 @@ public:
 		pRst = dbOper.ExecuteWithResSQL(sql);
 		if (NULL != pRst)
 		{
-			//printf("插入历史数据--%s-成功\n", pMarketData->InstrumentID);
+			printf("插入历史数据--%s-成功\n", pMarketData->InstrumentID);
 		}
 		else
 		{
