@@ -63,6 +63,15 @@ int nowDayOfWeek;
 int startMonTime;
 int nowDayOfMonth;
 
+int agtd_week;
+int autd_week;
+int au100g_week;
+int mautd_week;
+
+int agtd_month;
+int autd_month;
+int au100g_month;
+int mautd_month;
 
 //连接redis
 void ConnrectionRedis()
@@ -629,15 +638,16 @@ public:
 		strcpy(InstrumentID, origin_InstrumentID);*/
 
 
+		//品种克数计算 影响均价  总额除以总手数
 		int grammage = 1;
-		if (strcmp(origin_InstrumentID, "Au(T+D)") == 0)
+		if (strcmp(origin_InstrumentID, "Ag(T+D)") == 0)
+		{
+			strcpy(InstrumentID, "AGTD");
+		}
+		else if (strcmp(origin_InstrumentID, "Au(T+D)") == 0)
 		{
 			grammage = 1000;
 			strcpy(InstrumentID, "AUTD");
-		}
-		else if (strcmp(origin_InstrumentID, "Ag(T+D)") == 0)
-		{
-			strcpy(InstrumentID, "AGTD");
 		}
 		else if (strcmp(origin_InstrumentID, "Au100g") == 0)
 		{
@@ -649,8 +659,6 @@ public:
 			grammage = 100;
 			strcpy(InstrumentID, "MAUTD");
 		}
-
-
 		printf("%sK线种类：%s拼接时间：%s时间戳：%d==\n", prefix, InstrumentID, time_hms, market_Updatetimes);
 
 		//定义并赋值，存储redis行情信息
@@ -708,6 +716,103 @@ public:
 
 		int r_TempTime = r_Market_Updatetimes - (int(r_Market_Updatetimes) + 28800) % int(86400);
 
+		//程序重启 全局周 月 初始化0 只计算一次周 月成交量
+		if (agtd_week == 0 ||
+			autd_week == 0 ||
+			au100g_week == 0 ||
+			mautd_week == 0)
+		{
+			int st_w = get_time_week(r_lt, r_ptr);
+			//根据日成交量 计算今天之前周成交量
+			int week = get_sum_v(nowDayOfWeek, InstrumentID, st_w);
+
+			week_v = week;
+			if (strcmp(InstrumentID, "AGTD") == 0)
+			{
+				agtd_week = week;
+			}
+			else if (strcmp(InstrumentID, "AUTD") == 0)
+			{
+				autd_week = week;
+			}
+			else if (strcmp(InstrumentID, "AU100G") == 0)
+			{
+				au100g_week = week;
+			}
+			else if (strcmp(InstrumentID, "MAUTD") == 0)
+			{
+				mautd_week = week;
+			}
+		}
+		else
+		{
+			if (strcmp(InstrumentID, "AGTD") == 0)
+			{
+				week_v = agtd_week;
+			}
+			else if (strcmp(InstrumentID, "AUTD") == 0)
+			{
+				week_v = autd_week;
+			}
+			else if (strcmp(InstrumentID, "AU100G") == 0)
+			{
+				week_v = au100g_week;
+			}
+			else if (strcmp(InstrumentID, "MAUTD") == 0)
+			{
+				week_v = mautd_week;
+			}
+		}
+
+		if (agtd_month == 0 ||
+			autd_month == 0 ||
+			au100g_month == 0 ||
+			mautd_month == 0)
+		{
+			//月k
+			int st_m = get_time_month(r_ptr);
+			//根据日成交量 计算今天之前月成交量
+			int month = get_sum_v(nowDayOfMonth, InstrumentID, st_m);
+
+			month_v = month;
+			if (strcmp(InstrumentID, "AGTD") == 0)
+			{
+				agtd_month = month;
+			}
+			else if (strcmp(InstrumentID, "AUTD") == 0)
+			{
+				autd_month = month;
+			}
+			else if (strcmp(InstrumentID, "AU100G") == 0)
+			{
+				au100g_month = month;
+			}
+			else if (strcmp(InstrumentID, "MAUTD") == 0)
+			{
+				mautd_month = month;
+			}
+
+		}
+		else
+		{
+			if (strcmp(InstrumentID, "AGTD") == 0)
+			{
+				month_v = agtd_month;
+			}
+			else if (strcmp(InstrumentID, "AUTD") == 0)
+			{
+				month_v = autd_month;
+			}
+			else if (strcmp(InstrumentID, "AU100G") == 0)
+			{
+				month_v = au100g_month;
+			}
+			else if (strcmp(InstrumentID, "MAUTD") == 0)
+			{
+				month_v = mautd_month;
+			}
+		}
+
 		int endTime = 0;
 		int fenshi_i = 6;//判断分时
 						 //int len = sizeof(nameArray) / sizeof(char*);
@@ -738,9 +843,9 @@ public:
 			else if (i == 8)
 			{
 				//周 k
-				int st = get_time_week(r_lt, r_ptr);
-				//根据日成交量 计算今天之前周成交量
-				week_v = get_sum_v(nowDayOfWeek, InstrumentID, st);
+				//int st = get_time_week(r_lt, r_ptr);
+				////根据日成交量 计算今天之前周成交量
+				//week_v = get_sum_v(nowDayOfWeek, InstrumentID, st);
 
 				//以当前行情时间作为key
 				endTime = r_TempTime;
@@ -748,9 +853,9 @@ public:
 			else if (i == 9)
 			{
 				//月k
-				int st = get_time_month(r_ptr);
-				//根据日成交量 计算今天之前月成交量
-				month_v = get_sum_v(nowDayOfMonth, InstrumentID, st);
+				//int st = get_time_month(r_ptr);
+				////根据日成交量 计算今天之前月成交量
+				//month_v = get_sum_v(nowDayOfMonth, InstrumentID, st);
 
 				//以当前行情时间作为key
 				endTime = r_TempTime;
