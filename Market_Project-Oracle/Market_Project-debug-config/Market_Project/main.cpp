@@ -11,6 +11,7 @@
 #include <iostream>  
 #include <time.h>
 #include <ctype.h>
+#include <process.h> 
 
 #include <hiredis.h>
 #include <ocilib.h>
@@ -323,6 +324,296 @@ void delAndReplace(char str[], char d[], char oldChar, char newChar)
 	str[j] = '\0';
 }
 
+unsigned int __stdcall ThreadFunc(void* pM)
+{
+	CQdpFtdcDepthMarketDataField *pMarketData = (CQdpFtdcDepthMarketDataField *)pM;
+	//输出行情
+	//printf_Market(pMarketData);
+
+	_RecordsetPtr pRst;
+	char sql[1500] = { 0 };
+
+	//行情更新时间为  本地日期年月日 拼接行情时分秒
+	char nowtDate[100] = "";
+	char nowtTime[100] = "";
+	char market_time_str[100] = "";
+	char time_hms[30] = "";
+
+	struct tm *ptr;
+	time_t lt;
+	lt = time(NULL);
+	ptr = localtime(&lt);
+	strftime(nowtTime, sizeof(nowtTime), "%Y%m%d%H%M%S", localtime(&lt));
+
+	//fix 1:年月日用本地年月日拼接行情时分秒 因为行情时间晚八点之后日期会变为下一天
+	strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d", ptr);
+	strcpy(market_time_str, nowtDate);
+	strcpy(time_hms, pMarketData->UpdateTime);
+	strcat(market_time_str, " ");
+	strcat(market_time_str, time_hms);
+	int market_Updatetimes = (int)StringToDatetime(market_time_str);
+
+	//因行情时间有延迟 故在23:59:59秒 拼接的时候会出现本地日期已经过一天 行情时间还是上一天的bug 所以判断如果行情时间戳大于本地时间戳和大于不只一秒条件 就减去一个交易日
+	int now = (int)lt;
+	if (market_Updatetimes > now && (market_Updatetimes - now) > 60)
+	{
+		market_Updatetimes -= 24 * 60 * 60;
+	}
+
+	//合约标示去除多余字符 并转成大写字符
+	char origin_InstrumentID[31] = "";
+	strcpy(origin_InstrumentID, pMarketData->InstrumentID);
+	char InstrumentID[30] = "";
+	char d[5] = { '(', ')', '+' };
+	delAndReplace(origin_InstrumentID, d, '.', '_');
+	strcpy(InstrumentID, origin_InstrumentID);
+
+	printf("oracle行情%s拼接时间：%s--时间戳：%d=\n", InstrumentID, time_hms, market_Updatetimes);
+
+	//oracle时间戳类型 格式要遵循 yyyy - mm - dd hh : 24mi : ss.ff
+
+	//执行更新 表 语句
+	//sprintf_s(sql, "UPDATE QUOTATION SET TRADINGDAY  = '%s',SETTLEMENTGROUPID = '%s',SETTLEMENTID = %d,UPDATETIME = '%s',UPDATEMILLISEC = %d,EXCHANGEID = '%s',PRESETTLEMENTPRICE = %f,PRECLOSEPRICE = %f,PREOPENINTEREST = %f,PREDELTA = %f,OPENPRICE = %f,HIGHESTPRICE = %f,LOWESTPRICE = %f,CLOSEPRICE = %f, UPPERLIMITPRICE = %f,LOWERLIMITPRICE = %f,SETTLEMENTPRICE = %f,CURRDELTA = %f,LASTPRICE = %f,VOLUME = %d,TURNOVER = %f,OPENINTEREST = %f,BIDPRICE1 = %f,BIDVOLUME1 = %d,ASKPRICE1 = %f,ASKVOLUME1 = %d,BIDPRICE2 = %f,BIDVOLUME2 = %d,ASKPRICE2 = %f,ASKVOLUME2 = %d,BIDPRICE3 = %f,BIDVOLUME3 = %d,ASKPRICE3 = %f,ASKVOLUME3 = %d,BIDPRICE4 = %f,BIDVOLUME4 = %d,ASKPRICE4 = %f,ASKVOLUME4 = %d,BIDPRICE5 = %f,BIDVOLUME5 = %d,ASKPRICE5 = %f,ASKVOLUME5 = %d,DATET = to_date('%s','yyyymmddhh24miss'),DATED = %d WHERE INSTRUMENTID = '%s'",
+	//	pMarketData->TradingDay,
+	//	pMarketData->SettlementGroupID,
+	//	pMarketData->SettlementID,
+
+	//	pMarketData->UpdateTime,
+	//	pMarketData->UpdateMillisec,
+	//	pMarketData->ExchangeID,
+
+	//	//昨
+	//	pMarketData->PreSettlementPrice,
+	//	pMarketData->PreClosePrice,
+	//	pMarketData->PreOpenInterest,
+	//	pMarketData->PreDelta,
+
+	//	//今
+	//	pMarketData->OpenPrice,
+	//	pMarketData->HighestPrice,
+	//	pMarketData->LowestPrice,
+	//	pMarketData->ClosePrice,
+
+	//	pMarketData->UpperLimitPrice,
+	//	pMarketData->LowerLimitPrice,
+	//	pMarketData->SettlementPrice,
+	//	pMarketData->CurrDelta,
+
+	//	//其他
+	//	pMarketData->LastPrice,
+	//	pMarketData->Volume,
+	//	pMarketData->Turnover,
+	//	pMarketData->OpenInterest,
+
+	//	//申
+	//	//一
+	//	pMarketData->BidPrice1,
+	//	pMarketData->BidVolume1,
+	//	pMarketData->AskPrice1,
+	//	pMarketData->AskVolume1,
+
+	//	//二
+	//	pMarketData->BidPrice2,
+	//	pMarketData->BidVolume2,
+	//	pMarketData->AskPrice2,
+	//	pMarketData->AskVolume2,
+
+	//	//三
+	//	pMarketData->BidPrice3,
+	//	pMarketData->BidVolume3,
+	//	pMarketData->AskPrice3,
+	//	pMarketData->AskVolume3,
+
+	//	//四
+	//	pMarketData->BidPrice4,
+	//	pMarketData->BidVolume4,
+	//	pMarketData->AskPrice4,
+	//	pMarketData->AskVolume4,
+
+	//	//五
+	//	pMarketData->BidPrice5,
+	//	pMarketData->BidVolume5,
+	//	pMarketData->AskPrice5,
+	//	pMarketData->AskVolume5,
+	//	nowtTime,
+	//	market_Updatetimes,
+
+	//	pMarketData->InstrumentID
+	//);
+	//pRst = dbOper.ExecuteWithResSQL(sql);
+	//if (NULL != pRst)
+	//{
+	//	//printf("更新行情种类-%s---成功\n", pMarketData->InstrumentID);
+	//}
+	//else
+	//{
+	//	printf("更新行情种类---失败\n");
+	//}
+
+	//执行插入历史表语句  
+	sprintf_s(sql, "INSERT INTO %s (TRADINGDAY,SETTLEMENTGROUPID,SETTLEMENTID,INSTRUMENTID,UPDATETIME,UPDATEMILLISEC,EXCHANGEID,PRESETTLEMENTPRICE,PRECLOSEPRICE,PREOPENINTEREST,PREDELTA,OPENPRICE,HIGHESTPRICE,LOWESTPRICE,CLOSEPRICE,UPPERLIMITPRICE,LOWERLIMITPRICE,SETTLEMENTPRICE,CURRDELTA,LASTPRICE,VOLUME,TURNOVER,OPENINTEREST,BIDPRICE1,BIDVOLUME1,ASKPRICE1,ASKVOLUME1,BIDPRICE2,BIDVOLUME2,ASKPRICE2,ASKVOLUME2,BIDPRICE3,BIDVOLUME3,ASKPRICE3,ASKVOLUME3,BIDPRICE4,BIDVOLUME4,ASKPRICE4,ASKVOLUME4,BIDPRICE5,BIDVOLUME5,ASKPRICE5,ASKVOLUME5,DATET,DATED) VALUES ('%s','%s',%d,'%s','%s',%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,to_date('%s','yyyymmddhh24miss'),%d)",
+		InstrumentID,
+		//交易
+		pMarketData->TradingDay,
+		pMarketData->SettlementGroupID,
+		pMarketData->SettlementID,
+
+		pMarketData->InstrumentID,
+		pMarketData->UpdateTime,
+		pMarketData->UpdateMillisec,
+		pMarketData->ExchangeID,
+
+		//昨
+		pMarketData->PreSettlementPrice,
+		pMarketData->PreClosePrice,
+		pMarketData->PreOpenInterest,
+		pMarketData->PreDelta,
+
+		//今
+		pMarketData->OpenPrice,
+		pMarketData->HighestPrice,
+		pMarketData->LowestPrice,
+		pMarketData->ClosePrice,
+
+		pMarketData->UpperLimitPrice,
+		pMarketData->LowerLimitPrice,
+		pMarketData->SettlementPrice,
+		pMarketData->CurrDelta,
+
+		//其他
+		pMarketData->LastPrice,
+		pMarketData->Volume,
+		pMarketData->Turnover,
+		pMarketData->OpenInterest,
+
+		//申
+		//一
+		pMarketData->BidPrice1,
+		pMarketData->BidVolume1,
+		pMarketData->AskPrice1,
+		pMarketData->AskVolume1,
+
+		//二
+		pMarketData->BidPrice2,
+		pMarketData->BidVolume2,
+		pMarketData->AskPrice2,
+		pMarketData->AskVolume2,
+
+		//三
+		pMarketData->BidPrice3,
+		pMarketData->BidVolume3,
+		pMarketData->AskPrice3,
+		pMarketData->AskVolume3,
+
+		//四
+		pMarketData->BidPrice4,
+		pMarketData->BidVolume4,
+		pMarketData->AskPrice4,
+		pMarketData->AskVolume4,
+
+		//五
+		pMarketData->BidPrice5,
+		pMarketData->BidVolume5,
+		pMarketData->AskPrice5,
+		pMarketData->AskVolume5,
+		nowtTime,
+		market_Updatetimes
+	);
+	pRst = dbOper.ExecuteWithResSQL(sql);
+	if (NULL != pRst)
+	{
+		//printf("插入历史数据--%s-成功\n", pMarketData->InstrumentID);
+	}
+	else
+	{
+		printf("插入历史数据-%s--失败\n", pMarketData->InstrumentID);
+	}
+
+	char str_el[20] = "";
+	sprintf_s(str_el, "%lf", pMarketData->LastPrice);
+
+	//判断
+	if (strlen(str_el) != 0)
+	{
+		char value[2000] = "";
+
+		sprintf(value, "{\"TradingDay\":\"%s\",\"SettlementGroupID\":\"%s\",\"SettlementID\":%d,\"InstrumentID\":\"%s\",\"UpdateTime\":\"%s\",\"UpdateMillisec\":%d,\"ExchangeID\":\"%s\",\"PreSettlementPrice\":%lf,\"PreClosePrice\":%lf,\"PreOpenInterest\":%lf,\"PreDelta\":%lf,\"OpenPrice\":%lf,\"HighestPrice\":%lf,\"LowestPrice\":%lf,\"ClosePrice\":%lf,\"UpperLimitPrice\":%lf,\"LowerLimitPrice\":%lf,\"SettlementPrice\":%lf,\"CurrDelta\":%lf,\"LastPrice\":%lf,\"Volume\":%d,\"Turnover\":%lf,\"OpenInterest\":%lf,\"BidPrice1\":%lf,\"BidVolume1\":%d,\"AskPrice1\":%lf,\"AskVolume1\":%d,\"BidPrice2\":%lf,\"BidVolume2\":%d,\"AskPrice2\":%lf,\"AskVolume2\":%d,\"BidPrice3\":%lf,\"BidVolume3\":%d,\"AskPrice3\":%lf,\"AskVolume3\":%d,\"BidPrice4\":%lf,\"BidVolume4\":%d,\"AskPrice4\":%lf,\"AskVolume4\":%d,\"BidPrice5\":%lf,\"BidVolume5\":%d,\"AskPrice5\":%lf,\"AskVolume5\":%d}",
+			pMarketData->TradingDay,
+			pMarketData->SettlementGroupID,
+			pMarketData->SettlementID,
+
+			pMarketData->InstrumentID,
+			pMarketData->UpdateTime,
+			pMarketData->UpdateMillisec,
+			pMarketData->ExchangeID,
+
+			//昨
+			pMarketData->PreSettlementPrice,
+			pMarketData->PreClosePrice,
+			pMarketData->PreOpenInterest,
+			pMarketData->PreDelta,
+
+			//今
+			pMarketData->OpenPrice,
+			pMarketData->HighestPrice,
+			pMarketData->LowestPrice,
+			pMarketData->ClosePrice,
+
+			pMarketData->UpperLimitPrice,
+			pMarketData->LowerLimitPrice,
+			pMarketData->SettlementPrice,
+			pMarketData->CurrDelta,
+
+			//其他
+			pMarketData->LastPrice,
+			pMarketData->Volume,
+			pMarketData->Turnover,
+			pMarketData->OpenInterest,
+
+			//申
+			//一
+			pMarketData->BidPrice1,
+			pMarketData->BidVolume1,
+			pMarketData->AskPrice1,
+			pMarketData->AskVolume1,
+
+			//二
+			pMarketData->BidPrice2,
+			pMarketData->BidVolume2,
+			pMarketData->AskPrice2,
+			pMarketData->AskVolume2,
+
+			//三
+			pMarketData->BidPrice3,
+			pMarketData->BidVolume3,
+			pMarketData->AskPrice3,
+			pMarketData->AskVolume3,
+
+			//四
+			pMarketData->BidPrice4,
+			pMarketData->BidVolume4,
+			pMarketData->AskPrice4,
+			pMarketData->AskVolume4,
+
+			//五
+			pMarketData->BidPrice5,
+			pMarketData->BidVolume5,
+			pMarketData->AskPrice5,
+			pMarketData->AskVolume5
+		);
+
+		reply = (redisReply *)redisCommand(rc, "HMSET ALL_InstrumentID %s %s", InstrumentID, value);
+		//printf("哈希表插入信息：HMSET: %s\n\n", reply->str);
+		freeReplyObject(reply);
+	}
+	else
+	{
+		printf("品种：==%s==暂无行情数据，不能插入redis\n\n\n", InstrumentID);
+	}
+
+	_endthreadex(0);
+	return   0;
+}
 
 class CSimpleHandler : public CQdpFtdcMduserSpi
 {
@@ -497,291 +788,10 @@ public:
 	// 深度行情通知，行情服务器会主动通知客户端
 	void OnRtnDepthMarketData(CQdpFtdcDepthMarketDataField *pMarketData)
 	{
-
-		//输出行情
-		//printf_Market(pMarketData);
-		
-		_RecordsetPtr pRst;
-		char sql[1500] = { 0 };
-
-		//行情更新时间为  本地日期年月日 拼接行情时分秒
-		char nowtDate[100] = "";
-		char nowtTime[100] = "";
-		char market_time_str[100] = "";
-		char time_hms[30] = "";
-
-		struct tm *ptr;
-		time_t lt;
-		lt = time(NULL);
-		ptr = localtime(&lt);
-		strftime(nowtTime, sizeof(nowtTime), "%Y%m%d%H%M%S", localtime(&lt));
-
-		//fix 1:年月日用本地年月日拼接行情时分秒 因为行情时间晚八点之后日期会变为下一天
-		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d", ptr);
-		strcpy(market_time_str, nowtDate);
-		strcpy(time_hms, pMarketData->UpdateTime);
-		strcat(market_time_str, " ");
-		strcat(market_time_str, time_hms);
-		int market_Updatetimes = (int)StringToDatetime(market_time_str);
-
-		//因行情时间有延迟 故在23:59:59秒 拼接的时候会出现本地日期已经过一天 行情时间还是上一天的bug 所以判断如果行情时间戳大于本地时间戳和大于不只一秒条件 就减去一个交易日
-		int now = (int)lt;
-		if (market_Updatetimes > now && (market_Updatetimes - now) > 60)
-		{
-			market_Updatetimes -= 24 * 60 * 60;
-		}
-
-		//合约标示去除多余字符 并转成大写字符
-		char origin_InstrumentID[31] = "";
-		strcpy(origin_InstrumentID, pMarketData->InstrumentID);
-		char InstrumentID[30] = "";
-		char d[5] = { '(', ')', '+' };
-		delAndReplace(origin_InstrumentID, d, '.', '_');
-		strcpy(InstrumentID, origin_InstrumentID);
-
-		printf("oracle行情%s拼接时间：%s--时间戳：%d=\n", InstrumentID, time_hms, market_Updatetimes);
-
-		//oracle时间戳类型 格式要遵循 yyyy - mm - dd hh : 24mi : ss.ff
-
-		//执行更新 表 语句
-		//sprintf_s(sql, "UPDATE QUOTATION SET TRADINGDAY  = '%s',SETTLEMENTGROUPID = '%s',SETTLEMENTID = %d,UPDATETIME = '%s',UPDATEMILLISEC = %d,EXCHANGEID = '%s',PRESETTLEMENTPRICE = %f,PRECLOSEPRICE = %f,PREOPENINTEREST = %f,PREDELTA = %f,OPENPRICE = %f,HIGHESTPRICE = %f,LOWESTPRICE = %f,CLOSEPRICE = %f, UPPERLIMITPRICE = %f,LOWERLIMITPRICE = %f,SETTLEMENTPRICE = %f,CURRDELTA = %f,LASTPRICE = %f,VOLUME = %d,TURNOVER = %f,OPENINTEREST = %f,BIDPRICE1 = %f,BIDVOLUME1 = %d,ASKPRICE1 = %f,ASKVOLUME1 = %d,BIDPRICE2 = %f,BIDVOLUME2 = %d,ASKPRICE2 = %f,ASKVOLUME2 = %d,BIDPRICE3 = %f,BIDVOLUME3 = %d,ASKPRICE3 = %f,ASKVOLUME3 = %d,BIDPRICE4 = %f,BIDVOLUME4 = %d,ASKPRICE4 = %f,ASKVOLUME4 = %d,BIDPRICE5 = %f,BIDVOLUME5 = %d,ASKPRICE5 = %f,ASKVOLUME5 = %d,DATET = to_date('%s','yyyymmddhh24miss'),DATED = %d WHERE INSTRUMENTID = '%s'",
-		//	pMarketData->TradingDay,
-		//	pMarketData->SettlementGroupID,
-		//	pMarketData->SettlementID,
-
-		//	pMarketData->UpdateTime,
-		//	pMarketData->UpdateMillisec,
-		//	pMarketData->ExchangeID,
-
-		//	//昨
-		//	pMarketData->PreSettlementPrice,
-		//	pMarketData->PreClosePrice,
-		//	pMarketData->PreOpenInterest,
-		//	pMarketData->PreDelta,
-
-		//	//今
-		//	pMarketData->OpenPrice,
-		//	pMarketData->HighestPrice,
-		//	pMarketData->LowestPrice,
-		//	pMarketData->ClosePrice,
-
-		//	pMarketData->UpperLimitPrice,
-		//	pMarketData->LowerLimitPrice,
-		//	pMarketData->SettlementPrice,
-		//	pMarketData->CurrDelta,
-
-		//	//其他
-		//	pMarketData->LastPrice,
-		//	pMarketData->Volume,
-		//	pMarketData->Turnover,
-		//	pMarketData->OpenInterest,
-
-		//	//申
-		//	//一
-		//	pMarketData->BidPrice1,
-		//	pMarketData->BidVolume1,
-		//	pMarketData->AskPrice1,
-		//	pMarketData->AskVolume1,
-
-		//	//二
-		//	pMarketData->BidPrice2,
-		//	pMarketData->BidVolume2,
-		//	pMarketData->AskPrice2,
-		//	pMarketData->AskVolume2,
-
-		//	//三
-		//	pMarketData->BidPrice3,
-		//	pMarketData->BidVolume3,
-		//	pMarketData->AskPrice3,
-		//	pMarketData->AskVolume3,
-
-		//	//四
-		//	pMarketData->BidPrice4,
-		//	pMarketData->BidVolume4,
-		//	pMarketData->AskPrice4,
-		//	pMarketData->AskVolume4,
-
-		//	//五
-		//	pMarketData->BidPrice5,
-		//	pMarketData->BidVolume5,
-		//	pMarketData->AskPrice5,
-		//	pMarketData->AskVolume5,
-		//	nowtTime,
-		//	market_Updatetimes,
-
-		//	pMarketData->InstrumentID
-		//);
-		//pRst = dbOper.ExecuteWithResSQL(sql);
-		//if (NULL != pRst)
-		//{
-		//	//printf("更新行情种类-%s---成功\n", pMarketData->InstrumentID);
-		//}
-		//else
-		//{
-		//	printf("更新行情种类---失败\n");
-		//}
-
-		//执行插入历史表语句  
-		sprintf_s(sql, "INSERT INTO %s (TRADINGDAY,SETTLEMENTGROUPID,SETTLEMENTID,INSTRUMENTID,UPDATETIME,UPDATEMILLISEC,EXCHANGEID,PRESETTLEMENTPRICE,PRECLOSEPRICE,PREOPENINTEREST,PREDELTA,OPENPRICE,HIGHESTPRICE,LOWESTPRICE,CLOSEPRICE,UPPERLIMITPRICE,LOWERLIMITPRICE,SETTLEMENTPRICE,CURRDELTA,LASTPRICE,VOLUME,TURNOVER,OPENINTEREST,BIDPRICE1,BIDVOLUME1,ASKPRICE1,ASKVOLUME1,BIDPRICE2,BIDVOLUME2,ASKPRICE2,ASKVOLUME2,BIDPRICE3,BIDVOLUME3,ASKPRICE3,ASKVOLUME3,BIDPRICE4,BIDVOLUME4,ASKPRICE4,ASKVOLUME4,BIDPRICE5,BIDVOLUME5,ASKPRICE5,ASKVOLUME5,DATET,DATED) VALUES ('%s','%s',%d,'%s','%s',%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,to_date('%s','yyyymmddhh24miss'),%d)",
-			InstrumentID,
-			//交易
-			pMarketData->TradingDay,
-			pMarketData->SettlementGroupID,
-			pMarketData->SettlementID,
-
-			pMarketData->InstrumentID,
-			pMarketData->UpdateTime,
-			pMarketData->UpdateMillisec,
-			pMarketData->ExchangeID,
-
-			//昨
-			pMarketData->PreSettlementPrice,
-			pMarketData->PreClosePrice,
-			pMarketData->PreOpenInterest,
-			pMarketData->PreDelta,
-
-			//今
-			pMarketData->OpenPrice,
-			pMarketData->HighestPrice,
-			pMarketData->LowestPrice,
-			pMarketData->ClosePrice,
-
-			pMarketData->UpperLimitPrice,
-			pMarketData->LowerLimitPrice,
-			pMarketData->SettlementPrice,
-			pMarketData->CurrDelta,
-
-			//其他
-			pMarketData->LastPrice,
-			pMarketData->Volume,
-			pMarketData->Turnover,
-			pMarketData->OpenInterest,
-
-			//申
-			//一
-			pMarketData->BidPrice1,
-			pMarketData->BidVolume1,
-			pMarketData->AskPrice1,
-			pMarketData->AskVolume1,
-
-			//二
-			pMarketData->BidPrice2,
-			pMarketData->BidVolume2,
-			pMarketData->AskPrice2,
-			pMarketData->AskVolume2,
-
-			//三
-			pMarketData->BidPrice3,
-			pMarketData->BidVolume3,
-			pMarketData->AskPrice3,
-			pMarketData->AskVolume3,
-
-			//四
-			pMarketData->BidPrice4,
-			pMarketData->BidVolume4,
-			pMarketData->AskPrice4,
-			pMarketData->AskVolume4,
-
-			//五
-			pMarketData->BidPrice5,
-			pMarketData->BidVolume5,
-			pMarketData->AskPrice5,
-			pMarketData->AskVolume5,
-			nowtTime,
-			market_Updatetimes
-		);
-		pRst = dbOper.ExecuteWithResSQL(sql);
-		if (NULL != pRst)
-		{
-			printf("插入历史数据--%s-成功\n", pMarketData->InstrumentID);
-		}
-		else
-		{
-			printf("插入历史数据-%s--失败\n",pMarketData->InstrumentID);
-		}
-
-		char str_el[20] = "";
-		sprintf_s(str_el, "%lf", pMarketData->LastPrice);
-
-		//判断
-		if (strlen(str_el) != 0)
-		{
-			char value[2000] = "";
-
-			sprintf(value, "{\"TradingDay\":\"%s\",\"SettlementGroupID\":\"%s\",\"SettlementID\":%d,\"InstrumentID\":\"%s\",\"UpdateTime\":\"%s\",\"UpdateMillisec\":%d,\"ExchangeID\":\"%s\",\"PreSettlementPrice\":%lf,\"PreClosePrice\":%lf,\"PreOpenInterest\":%lf,\"PreDelta\":%lf,\"OpenPrice\":%lf,\"HighestPrice\":%lf,\"LowestPrice\":%lf,\"ClosePrice\":%lf,\"UpperLimitPrice\":%lf,\"LowerLimitPrice\":%lf,\"SettlementPrice\":%lf,\"CurrDelta\":%lf,\"LastPrice\":%lf,\"Volume\":%d,\"Turnover\":%lf,\"OpenInterest\":%lf,\"BidPrice1\":%lf,\"BidVolume1\":%d,\"AskPrice1\":%lf,\"AskVolume1\":%d,\"BidPrice2\":%lf,\"BidVolume2\":%d,\"AskPrice2\":%lf,\"AskVolume2\":%d,\"BidPrice3\":%lf,\"BidVolume3\":%d,\"AskPrice3\":%lf,\"AskVolume3\":%d,\"BidPrice4\":%lf,\"BidVolume4\":%d,\"AskPrice4\":%lf,\"AskVolume4\":%d,\"BidPrice5\":%lf,\"BidVolume5\":%d,\"AskPrice5\":%lf,\"AskVolume5\":%d}",
-				pMarketData->TradingDay, 
-				pMarketData->SettlementGroupID, 
-				pMarketData->SettlementID,
-
-				pMarketData->InstrumentID,
-				pMarketData->UpdateTime,
-				pMarketData->UpdateMillisec,
-				pMarketData->ExchangeID,
-
-				//昨
-				pMarketData->PreSettlementPrice,
-				pMarketData->PreClosePrice,
-				pMarketData->PreOpenInterest,
-				pMarketData->PreDelta, 
-
-				//今
-				pMarketData->OpenPrice,
-				pMarketData->HighestPrice,
-				pMarketData->LowestPrice,
-				pMarketData->ClosePrice,
-
-				pMarketData->UpperLimitPrice,
-				pMarketData->LowerLimitPrice,
-				pMarketData->SettlementPrice,
-				pMarketData->CurrDelta,
-
-				//其他
-				pMarketData->LastPrice,
-				pMarketData->Volume,
-				pMarketData->Turnover,
-				pMarketData->OpenInterest,
-
-				//申
-				//一
-				pMarketData->BidPrice1,
-				pMarketData->BidVolume1,
-				pMarketData->AskPrice1,
-				pMarketData->AskVolume1,
-
-				//二
-				pMarketData->BidPrice2,
-				pMarketData->BidVolume2,
-				pMarketData->AskPrice2,
-				pMarketData->AskVolume2,
-
-				//三
-				pMarketData->BidPrice3,
-				pMarketData->BidVolume3,
-				pMarketData->AskPrice3,
-				pMarketData->AskVolume3,
-
-				//四
-				pMarketData->BidPrice4,
-				pMarketData->BidVolume4,
-				pMarketData->AskPrice4,
-				pMarketData->AskVolume4,
-
-				//五
-				pMarketData->BidPrice5,
-				pMarketData->BidVolume5,
-				pMarketData->AskPrice5,
-				pMarketData->AskVolume5
-			);
-
-			reply = (redisReply *)redisCommand(rc, "HMSET ALL_InstrumentID %s %s", InstrumentID, value);
-			//printf("哈希表插入信息：HMSET: %s\n\n", reply->str);
-			freeReplyObject(reply);
-		}
-		else
-		{
-			printf("品种：==%s==暂无行情数据，不能插入redis\n\n\n", InstrumentID);
-		}	
-
+		HANDLE   hThread;
+		hThread = (HANDLE)_beginthreadex(NULL, 0, &ThreadFunc, pMarketData, 0, NULL);//&param表示传递参数
+		WaitForSingleObject(hThread, INFINITE);
+		CloseHandle(hThread);
 	}
 
 	// 针对用户请求的出错通知

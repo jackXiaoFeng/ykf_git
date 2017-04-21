@@ -11,14 +11,14 @@
 #include <iostream>  
 #include <time.h>
 #include <ctype.h>
-
+#include <process.h> 
 #include <hiredis.h>
 #include <ocilib.h>
 #include "cJSON.h"
 
 #include "Config.h"
 
-#define prefix ""
+#define prefix "t__"
 
 #define NO_QFORKIMPL //这一行必须加才能正常使用
 
@@ -73,6 +73,7 @@ int autd_month;
 int au100g_month;
 int mautd_month;
 
+unsigned   Counter;
 //连接redis
 void ConnrectionRedis()
 {
@@ -357,6 +358,720 @@ void delAndReplace(char *str, char *d, char oldChar, char newChar)
 	str[j] = '\0';
 }
 
+//unsigned   __stdcall   SecondThreadFunc(void*   pArguments)
+//{
+//	Play_Param *pp = (Play_Param *)pArguments;
+//
+//	int aa = pp->sliderRange;
+//
+//
+//	while (Counter   <   1000000)
+//		Counter++;
+//
+//	printf("SecondThreadFunc-%d--%d\n", aa, Counter);
+//	_endthreadex(0);
+//	return   0;
+//}
+
+unsigned int __stdcall ThreadFunc(void* pM)
+{
+	CQdpFtdcDepthMarketDataField *pMarketData = (CQdpFtdcDepthMarketDataField *)pM;
+
+	//输出行情
+	//printf_Market(pMarketData);
+
+	//行情更新时间为  本地日期年月日 拼接行情时分秒
+	char nowtDate[30] = "";
+	char marketDate[12] = "";
+	char market_time_str[30] = "";
+	char r_Market_time_str[30] = "";
+	char time_hms[9] = "";
+
+	struct tm *ptr;
+	time_t lt;
+	lt = time(NULL);
+	ptr = localtime(&lt);
+	//fix 1:年月日用本地年月日拼接行情时分秒 因为行情时间晚八点之后日期会变为下一天
+	//本地日期+行情时分秒 用于计算 分钟k
+	strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d", ptr);
+	strcpy(market_time_str, nowtDate);
+	strcpy(time_hms, pMarketData->UpdateTime);
+	strcat(market_time_str, " ");
+	strcat(market_time_str, time_hms);
+	int market_Updatetimes = (int)StringToDatetime(market_time_str);
+
+	//因行情时间有延迟 故在23:59:59秒 拼接的时候会出现本地日期已经过一天 行情时间还是上一天的bug 所以判断如果行情时间戳大于本地时间戳和大于不只一秒条件 就减去一个交易日
+	int now = (int)lt;
+	if (market_Updatetimes > now && (market_Updatetimes - now) > 60)
+	{
+		market_Updatetimes -= 24 * 60 * 60;
+	}
+
+	//行情日期+行情时分秒 用于计算日/周/月k
+	int r_Market_Updatetimes;
+	strcpy(marketDate, pMarketData->TradingDay);
+	sprintf_s(marketDate, "%s-%s-%s", substring(marketDate, 0, 4), substring(marketDate, 4, 2), substring(marketDate, 6, 2));
+
+	if (strcmp(marketDate, nowtDate) != 0)
+	{
+		strcpy(r_Market_time_str, marketDate);
+		strcat(r_Market_time_str, " ");
+		strcat(r_Market_time_str, time_hms);
+		r_Market_Updatetimes = (int)StringToDatetime(r_Market_time_str);
+	}
+	else
+	{
+		r_Market_Updatetimes = market_Updatetimes;
+	}
+	struct tm *r_ptr;
+	time_t r_lt;
+
+	//9:00-11:30 13:30-15:30 20:00-24:00 00:00-02:00
+	/*#20:00 = 72000,
+	2:30 = 9000,2:31 = 9060,
+	9:00 = 32400,
+	11:30 = 41400, 11:31=4160
+	13:30 = 48600,
+	15:30 = 55800 15:30 = 55860
+	*/
+	//根据行情更新时间来确定是否是在开盘价之内 是否存redis
+	int dds = market_Updatetimes;
+	nowTimestamp_Surplus = (int(dds) + 28800) % int(86400);
+	nowTimestamp_Zero = dds - nowTimestamp_Surplus;
+
+	//停盘时间加一分钟 是为了结束时30:00减去前一个时间段 算出成交量
+	if ((nowTimestamp_Surplus > 72000 || nowTimestamp_Surplus < 9060) ||
+		(nowTimestamp_Surplus >32400 && nowTimestamp_Surplus < 41460) ||
+		(nowTimestamp_Surplus >48600 && nowTimestamp_Surplus < 55860))
+	{
+		//printf("开盘时间");
+	}
+	else
+	{
+		//printf("休盘时间\n");
+		//休盘时间 直接跳出回调函数
+		_endthreadex(0);
+		return   0;
+	}
+
+	//是否是停盘最后一分钟
+	bool isLastMinutes = false;
+	if ((nowTimestamp_Surplus >= 9000 && nowTimestamp_Surplus < 9060) ||
+		(nowTimestamp_Surplus >= 41400 && nowTimestamp_Surplus < 41460) ||
+		(nowTimestamp_Surplus >= 55800 && nowTimestamp_Surplus < 55860))
+	{
+		//特殊收盘时间k线不加间隔
+		isLastMinutes = true;
+	}
+
+	//合约标示去除多余字符 并转成大写字符
+	char origin_InstrumentID[31] = "";
+	char InstrumentID[30] = "";
+	strcpy(origin_InstrumentID, pMarketData->InstrumentID);
+	/*char d[5] = { '(', ')', '+' };
+	delAndReplace(origin_InstrumentID, d, '.', '_');
+	strcpy(InstrumentID, origin_InstrumentID);*/
+
+
+	//品种克数计算 影响均价  总额除以总手数
+	int grammage = 1;
+	if (strcmp(origin_InstrumentID, "Ag(T+D)") == 0)
+	{
+		strcpy(InstrumentID, "AGTD");
+	}
+	else if (strcmp(origin_InstrumentID, "Au(T+D)") == 0)
+	{
+		grammage = 1000;
+		strcpy(InstrumentID, "AUTD");
+	}
+	else if (strcmp(origin_InstrumentID, "Au100g") == 0)
+	{
+		grammage = 100;
+		strcpy(InstrumentID, "AU100G");
+	}
+	else if (strcmp(origin_InstrumentID, "mAu(T+D)") == 0)
+	{
+		grammage = 100;
+		strcpy(InstrumentID, "MAUTD");
+	}
+	printf("%sK线种类：%s拼接时间：%s时间戳：%d==\n", prefix, InstrumentID, time_hms, market_Updatetimes);
+
+	//定义并赋值，存储redis行情信息
+	double maxl = pMarketData->HighestPrice;
+	double minl = pMarketData->LowestPrice;
+	double sl = pMarketData->OpenPrice;
+	double el = pMarketData->LastPrice;
+	int v = pMarketData->Volume;
+	double turnover = pMarketData->Turnover;
+
+	//存储信息
+	char myhash[50] = "";
+	char myhash_v[50] = "";
+	char value[200] = "";
+
+	char *nameArray[10] = { "","","" ,"","","" };
+	nameArray[0] = "f1_minutes";
+	nameArray[1] = "f5_minutes";
+	nameArray[2] = "f15_minutes";
+	nameArray[3] = "f30_minutes";
+	nameArray[4] = "f60_minutes";
+	nameArray[5] = "f240_minutes";
+	nameArray[6] = "fenshi_1_minutes";
+	nameArray[7] = "f1_day";
+	nameArray[8] = "f1_week";
+	nameArray[9] = "f1_month";
+
+	int time_interval_local_array[10] = {
+		60,
+		5 * 60,
+		15 * 60,
+		30 * 60,
+		60 * 60,
+		240 * 60,
+		60,
+		24 * 60 * 60,
+		3 * 24 * 60 * 60,
+		32 * 24 * 60 * 60
+	};
+
+	char name[30] = "";
+	int time_interval_local;
+
+	lt = time_t(market_Updatetimes);
+	ptr = localtime(&lt);
+
+	r_lt = time_t(r_Market_Updatetimes);
+	r_ptr = localtime(&r_lt);
+
+	//去除时间戳秒数
+	int ss = int(market_Updatetimes) % int(60);
+	market_Updatetimes = market_Updatetimes - ss;
+
+	r_Market_Updatetimes = r_Market_Updatetimes - ss;
+
+	int r_TempTime = r_Market_Updatetimes - (int(r_Market_Updatetimes) + 28800) % int(86400);
+
+	//程序重启 全局周 月 初始化0 只计算一次周 月成交量
+	if (agtd_week == 0 ||
+		autd_week == 0 ||
+		au100g_week == 0 ||
+		mautd_week == 0)
+	{
+		int st_w = get_time_week(r_lt, r_ptr);
+		//根据日成交量 计算今天之前周成交量
+		int week = get_sum_v(nowDayOfWeek, InstrumentID, st_w);
+
+		week_v = week;
+		if (strcmp(InstrumentID, "AGTD") == 0)
+		{
+			agtd_week = week;
+		}
+		else if (strcmp(InstrumentID, "AUTD") == 0)
+		{
+			autd_week = week;
+		}
+		else if (strcmp(InstrumentID, "AU100G") == 0)
+		{
+			au100g_week = week;
+		}
+		else if (strcmp(InstrumentID, "MAUTD") == 0)
+		{
+			mautd_week = week;
+		}
+	}
+	else
+	{
+		if (strcmp(InstrumentID, "AGTD") == 0)
+		{
+			week_v = agtd_week;
+		}
+		else if (strcmp(InstrumentID, "AUTD") == 0)
+		{
+			week_v = autd_week;
+		}
+		else if (strcmp(InstrumentID, "AU100G") == 0)
+		{
+			week_v = au100g_week;
+		}
+		else if (strcmp(InstrumentID, "MAUTD") == 0)
+		{
+			week_v = mautd_week;
+		}
+	}
+
+	if (agtd_month == 0 ||
+		autd_month == 0 ||
+		au100g_month == 0 ||
+		mautd_month == 0)
+	{
+		//月k
+		int st_m = get_time_month(r_ptr);
+		//根据日成交量 计算今天之前月成交量
+		int month = get_sum_v(nowDayOfMonth, InstrumentID, st_m);
+
+		month_v = month;
+		if (strcmp(InstrumentID, "AGTD") == 0)
+		{
+			agtd_month = month;
+		}
+		else if (strcmp(InstrumentID, "AUTD") == 0)
+		{
+			autd_month = month;
+		}
+		else if (strcmp(InstrumentID, "AU100G") == 0)
+		{
+			au100g_month = month;
+		}
+		else if (strcmp(InstrumentID, "MAUTD") == 0)
+		{
+			mautd_month = month;
+		}
+
+	}
+	else
+	{
+		if (strcmp(InstrumentID, "AGTD") == 0)
+		{
+			month_v = agtd_month;
+		}
+		else if (strcmp(InstrumentID, "AUTD") == 0)
+		{
+			month_v = autd_month;
+		}
+		else if (strcmp(InstrumentID, "AU100G") == 0)
+		{
+			month_v = au100g_month;
+		}
+		else if (strcmp(InstrumentID, "MAUTD") == 0)
+		{
+			month_v = mautd_month;
+		}
+	}
+
+	int endTime = 0;
+	int fenshi_i = 6;//判断分时
+					 //int len = sizeof(nameArray) / sizeof(char*);
+	for (int i = 0; i < 10; ++i)
+	{
+		//设定k线名字和时间间隔
+		strcpy(name, nameArray[i]);
+		sprintf_s(myhash, "%s%s_%s", prefix, InstrumentID, name);
+		sprintf_s(myhash_v, "%s%s_%s_%s", prefix, InstrumentID, name, "CurrentV");
+		time_interval_local = time_interval_local_array[i];
+
+
+		if (i == 4)
+		{
+			//60分钟 K
+			endTime = compare_time_60(market_Updatetimes, time_interval_local, marketDate);
+		}
+		else if (i == 5)
+		{
+			//240分钟 K
+			endTime = compare_time_240(marketDate);
+		}
+		else if (i == 7)
+		{
+			//日 K
+			endTime = r_TempTime;
+		}
+		else if (i == 8)
+		{
+			//周 k
+			//int st = get_time_week(r_lt, r_ptr);
+			////根据日成交量 计算今天之前周成交量
+			//week_v = get_sum_v(nowDayOfWeek, InstrumentID, st);
+
+			//以当前行情时间作为key
+			endTime = r_TempTime;
+		}
+		else if (i == 9)
+		{
+			//月k
+			//int st = get_time_month(r_ptr);
+			////根据日成交量 计算今天之前月成交量
+			//month_v = get_sum_v(nowDayOfMonth, InstrumentID, st);
+
+			//以当前行情时间作为key
+			endTime = r_TempTime;
+		}
+		else
+		{
+			// 1 5 15 30
+			int local = isLastMinutes ? 0 : time_interval_local;
+			endTime = market_Updatetimes + local;
+			endTime = endTime - int(endTime) % int(time_interval_local);
+		}
+
+
+		char str_el[20] = "";
+		sprintf_s(str_el, "%lf", el);
+		//判断
+		if (strlen(str_el) != 0)
+		{
+			reply = (redisReply *)redisCommand(rc, "HKEYS %s", myhash);
+			if (reply &&  reply->elements>0) {
+				//释放HKEYS 的reply 
+				freeReplyObject(reply);
+
+				//获取redis《记录哈希表》中数据 成交量v  用当前行情成交量v 减去记录v 就是这个时间段v的值
+				reply = (redisReply *)redisCommand(rc, "GET %s", myhash_v);
+				if (reply->str == NULL)
+				{
+					printf("redis-获取%s失败", myhash_v);
+					_endthreadex(0);
+					return   0;
+				}
+				cJSON *root = cJSON_Parse(reply->str);
+				double current_maxl;
+				double current_minl;
+				double current_sl;
+
+				double origin_maxl;
+				double origin_minl;
+				double origin_sl;
+				double origin_el;
+				double origin_turnover;
+
+
+				//判断是否是下个周 月k 间隔不确定 判断
+				bool isNext = false;
+
+				int current_v = cJSON_GetObjectItem(root, "v")->valueint;
+				int max_time = cJSON_GetObjectItem(root, "dated")->valueint;
+				int interval_v = cJSON_GetObjectItem(root, "interval_v")->valueint;
+				origin_el = cJSON_GetObjectItem(root, "el")->valuedouble;
+
+				//收盘价为零 就把上一个收盘价赋值给收盘价 
+				if (el == 0.0)
+				{
+					el = origin_el;
+				}
+
+				if (i == fenshi_i)
+				{
+					origin_turnover = cJSON_GetObjectItem(root, "turnover")->valuedouble;
+				}
+				else
+				{
+					current_maxl = cJSON_GetObjectItem(root, "maxl")->valuedouble;
+					current_minl = cJSON_GetObjectItem(root, "minl")->valuedouble;
+					current_sl = cJSON_GetObjectItem(root, "sl")->valuedouble;
+
+					origin_maxl = current_maxl;
+					origin_minl = current_minl;
+					origin_sl = current_sl;
+
+					current_maxl = current_maxl > el ? current_maxl : el;
+					current_minl = current_minl < el ? current_minl : el;
+				}
+
+				if (i == 9 && max_time != endTime)
+				{
+					lt = time_t(max_time);
+					ptr = localtime(&lt);
+					int max_Month = ptr->tm_mon + 1;
+
+					lt = time_t(endTime);
+					ptr = localtime(&lt);
+					int end_Month = ptr->tm_mon + 1;
+
+					if (max_Month != end_Month)
+					{
+						isNext = true;
+					}
+				}
+				freeReplyObject(reply);
+
+				//新插入数据 是否要更新记录数据
+				int upDateCurrent = true;
+
+				if (endTime - max_time >= time_interval_local || isNext)
+				{
+					int now_time_v = v - interval_v - current_v;
+					//晚8:00 清盘成交量==0；
+					if (now_time_v < 0)
+					{
+						now_time_v = v;
+					}
+
+					if (i == 7)
+					{
+						now_time_v = v;
+					}
+					else if (i == 8)
+					{
+						now_time_v = v + week_v;
+					}
+					else if (i == 9)
+					{
+						now_time_v = v + month_v;
+					}
+
+					//printf("<<v=%d<<<<<interval_v=%d<<<<<current_v=%d<<<<<<<<：%d：>>>>>>>>>>>>>>>>\n", v, interval_v, current_v, now_time_v);
+					if (i == fenshi_i)
+					{
+						float el_meanline = (float)turnover / (v*grammage);
+						sprintf(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, now_time_v, el_meanline, endTime);
+					}
+					else
+					{
+						sprintf(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", el, el, el, el, now_time_v, endTime);
+					}
+					reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, endTime, value);
+					freeReplyObject(reply);
+
+					//更新v
+					if (i == fenshi_i)
+					{
+						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"turnover\":%lf,\"dated\":%d}", el, now_time_v, v, turnover, endTime);
+					}
+					else
+					{
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", el, el, el, el, now_time_v, v, endTime);
+					}
+					reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
+					freeReplyObject(reply);
+
+					//更新上一个插入值
+					endTime = max_time;
+					//不更新记录值
+					upDateCurrent = false;
+
+
+				}
+				/*else
+				{*/
+				//时间间隔内 update_v = v - interval_v;
+
+				int  update_v;
+				if (i == 7)
+				{
+					update_v = upDateCurrent ? v : current_v;
+				}
+				else if (i == 8)
+				{
+					update_v = upDateCurrent ? v + week_v : current_v;
+				}
+				else if (i == 9)
+				{
+					update_v = upDateCurrent ? v + month_v : current_v;
+				}
+				else
+				{
+					update_v = v - interval_v;
+					if (update_v < 0)
+					{
+						//换一个交易日 则为上个间隔记录值
+						update_v = current_v;
+					}
+				}
+
+				//printf("小于时间间隔内的手数: %d==总手数%d=v_changeNum=%d--sum_el-%f\n\n", v, update_v, v_changeNum, sum_el);
+
+				//更新k线数据（成交量算手数 更新）
+				//有新间隔插入 则除了成交量 其余值全部用原记录值
+				if (upDateCurrent)
+				{
+					if (i == fenshi_i)
+					{
+						float el_meanline = (float)turnover / (v*grammage);
+						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%f,\"dated\":%d}", el, update_v, el_meanline, endTime);
+					}
+					else
+					{
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", current_maxl, current_minl, current_sl, el, update_v, endTime);
+					}
+				}
+				else
+				{
+					if (i == fenshi_i)
+					{
+						float el_meanline = (float)origin_turnover / ((current_v + interval_v)*grammage);
+						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%f,\"dated\":%d}", origin_el, update_v, el_meanline, endTime);
+					}
+					else
+					{
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", origin_maxl, origin_minl, origin_sl, origin_el, update_v, endTime);
+					}
+				}
+
+				reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, max_time, value);
+				freeReplyObject(reply);
+
+				//更新记录数据（开盘价，成交量 不更新）相当于k线数据最后一条
+				if (upDateCurrent)
+				{
+					if (i == fenshi_i)
+					{
+						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"turnover\":%lf,\"dated\":%d}", el, update_v, interval_v, turnover, endTime);
+					}
+					else
+					{
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", current_maxl, current_minl, current_sl, el, update_v, interval_v, endTime);
+					}
+					reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
+					freeReplyObject(reply);
+
+					//周 月k最后时间戳 需要显示当日时间戳 遇到下周/月 则跳为下周/月 故要删除前一个日时间戳
+					if (i == 8 || i == 9)
+					{
+						if (endTime != max_time)
+						{
+							reply = (redisReply *)redisCommand(rc, "HDEL %s %d", myhash, max_time);
+							freeReplyObject(reply);
+						}
+					}
+				}
+				//}
+				free(root);
+			}
+			else {
+				printf("redisCommand [lrange mylist 0 -1] error:%d. %s\n", reply->type, reply->str);
+				if (reply->str == NULL)
+				{
+					//printf("没有 《记录哈希表》 和 《k线哈希表》\n");
+					//释放HKEYS 的reply 
+					freeReplyObject(reply);
+
+					int tempV = v;
+					if (i == 8)
+					{
+						tempV = tempV + week_v;
+					}
+					else if (i == 9)
+					{
+						tempV = tempV + month_v;
+					}
+
+					//没有 《k线哈希表》 则创建表 并设置各参数默认值
+					//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
+					if (i == fenshi_i)
+					{
+						float el_meanline = (float)turnover / (v*grammage);
+						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, tempV, el_meanline, endTime);
+					}
+					else
+					{
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", el, el, el, el, tempV, endTime);
+					}
+					reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, endTime, value);
+					//printf("第一条哈希表插入信息：HMSET: %s\n\n\n", reply->str);
+					freeReplyObject(reply);
+
+					//记录值默认 都是LastPrice v 和 interval_v 默认总成交量 endTime默认行情去秒数时间
+					if (i == fenshi_i)
+					{
+						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"turnover\":%lf,\"dated\":%d}", el, v, v, turnover, endTime);
+					}
+					else
+					{
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", el, el, el, el, v, v, endTime);
+					}
+					reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
+					//printf("第一条SET: %s\n", reply->str);
+					freeReplyObject(reply);
+				}
+			}
+		}
+		else
+		{
+			printf("品种：==%s==暂无行情数据，不能插入redis\n\n\n", InstrumentID);
+		}
+	}
+
+	//明细
+	char detailName[30] = "fenshi_1_minutes_detail";
+
+	char detail_myhash[50];
+	sprintf_s(detail_myhash, "%s%s_%s", prefix, InstrumentID, detailName);
+
+	reply = (redisReply *)redisCommand(rc, "HKEYS %s", detail_myhash);
+	//printf("=========HKEYS: %d\n", reply->elements);
+	if (reply &&  reply->elements>0) {
+
+		int max_time;
+		int min_time;
+
+		//更新
+		int *array;
+		min_time = atoi(reply->element[0]->str);
+		max_time = atoi(reply->element[0]->str);
+
+		int len = reply->elements;
+		array = (int*)calloc(len, sizeof(int));
+		for (int i = 0; i < len; i++)
+		{
+			array[i] = atoi(reply->element[i]->str);
+			if (array[i] < min_time)
+			{
+				min_time = array[i];
+			}
+
+			if (array[i] > max_time)
+			{
+				max_time = array[i];
+			}
+
+			//printf("i=%d--%d\n", i, array[i]);
+		}
+
+		free(array);
+		//释放HKEYS 的reply 
+		freeReplyObject(reply);
+
+		reply = (redisReply *)redisCommand(rc, "HGET  %s %d", detail_myhash, max_time);
+		if (reply->str == NULL)
+		{
+			_endthreadex(0);
+			return   0;
+		}
+		cJSON *root = cJSON_Parse(reply->str);
+		int  temInterval_v = cJSON_GetObjectItem(root, "VOL")->valueint;
+		int  total_v = cJSON_GetObjectItem(root, "total_VOL")->valueint;
+
+		int fenshiInterval_v = v - total_v;
+		//printf("最小time=%d--最大time=%d=dds-%d=实时V=%d==最大V=%d==间隔V=%d--\n", min_time, max_time, dds,v, total_v, fenshiInterval_v);
+		freeReplyObject(reply);
+
+		if (fenshiInterval_v != 0 && max_time != dds)
+		{
+			if (len > 19)
+			{
+				//删除最小值
+				//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
+				reply = (redisReply *)redisCommand(rc, "HDEL %s %d", detail_myhash, min_time);
+				//printf("删除最小%d---%s\n", min_time, reply->str);
+				freeReplyObject(reply);
+			}
+
+			//插入
+			//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
+			sprintf_s(value, "{\"time\":%d,\"price\":%lf,\"VOL\":%d,\"total_VOL\":%d}", dds, el, fenshiInterval_v, v);
+			reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", detail_myhash, dds, value);
+			//printf("插入实时%d---%s\n", dds, reply->str);
+			freeReplyObject(reply);
+
+		}
+	}
+	else {
+		printf("redisCommand [lrange mylist 0 -1] error:%d. %s\n", reply->type, reply->str);
+		if (reply->str == NULL)
+		{
+			//释放HKEYS 的reply 
+			freeReplyObject(reply);
+
+			//没有 《k线哈希表》 则创建表 并设置各参数默认值
+			//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
+			sprintf_s(value, "{\"time\":%d,\"price\":%lf,\"VOL\":%d,\"total_VOL\":%d}", dds, el, v, v);
+			reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", detail_myhash, dds, value);
+			freeReplyObject(reply);
+		}
+	}
+
+	_endthreadex(0);
+	return   0;
+}
 
 class CSimpleHandler : public CQdpFtdcMduserSpi
 {
@@ -542,695 +1257,10 @@ public:
 	// 深度行情通知，行情服务器会主动通知客户端
 	void OnRtnDepthMarketData(CQdpFtdcDepthMarketDataField *pMarketData)
 	{
-
-		//输出行情
-		//printf_Market(pMarketData);
-
-		//行情更新时间为  本地日期年月日 拼接行情时分秒
-		char nowtDate[30] = "";
-		char marketDate[12] = "";
-		char market_time_str[30] = "";
-		char r_Market_time_str[30] = "";
-		char time_hms[9] = "";
-
-		struct tm *ptr;
-		time_t lt;
-		lt = time(NULL);
-		ptr = localtime(&lt);
-		//fix 1:年月日用本地年月日拼接行情时分秒 因为行情时间晚八点之后日期会变为下一天
-		//本地日期+行情时分秒 用于计算 分钟k
-		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d", ptr);
-		strcpy(market_time_str, nowtDate);
-		strcpy(time_hms, pMarketData->UpdateTime);
-		strcat(market_time_str, " ");
-		strcat(market_time_str, time_hms);
-		int market_Updatetimes = (int)StringToDatetime(market_time_str);
-
-		//因行情时间有延迟 故在23:59:59秒 拼接的时候会出现本地日期已经过一天 行情时间还是上一天的bug 所以判断如果行情时间戳大于本地时间戳和大于不只一秒条件 就减去一个交易日
-		int now = (int)lt;
-		if (market_Updatetimes > now && (market_Updatetimes - now) > 60)
-		{
-			market_Updatetimes -= 24 * 60 * 60;
-		}
-
-		//行情日期+行情时分秒 用于计算日/周/月k
-		int r_Market_Updatetimes;
-		strcpy(marketDate, pMarketData->TradingDay);
-		sprintf_s(marketDate, "%s-%s-%s", substring(marketDate, 0, 4), substring(marketDate, 4, 2), substring(marketDate, 6, 2));
-
-		if (strcmp(marketDate, nowtDate) != 0)
-		{
-			strcpy(r_Market_time_str, marketDate);
-			strcat(r_Market_time_str, " ");
-			strcat(r_Market_time_str, time_hms);
-			r_Market_Updatetimes = (int)StringToDatetime(r_Market_time_str);
-		}
-		else
-		{
-			r_Market_Updatetimes = market_Updatetimes;
-		}
-		struct tm *r_ptr;
-		time_t r_lt;
-
-		//9:00-11:30 13:30-15:30 20:00-24:00 00:00-02:00
-		/*#20:00 = 72000,
-		2:30 = 9000,2:31 = 9060,
-		9:00 = 32400,
-		11:30 = 41400, 11:31=4160
-		13:30 = 48600,
-		15:30 = 55800 15:30 = 55860
-		*/
-		//根据行情更新时间来确定是否是在开盘价之内 是否存redis
-		int dds = market_Updatetimes;
-		nowTimestamp_Surplus = (int(dds) + 28800) % int(86400);
-		nowTimestamp_Zero = dds - nowTimestamp_Surplus;
-
-		//停盘时间加一分钟 是为了结束时30:00减去前一个时间段 算出成交量
-		if ((nowTimestamp_Surplus > 72000 || nowTimestamp_Surplus < 9060) ||
-			(nowTimestamp_Surplus >32400 && nowTimestamp_Surplus < 41460) ||
-			(nowTimestamp_Surplus >48600 && nowTimestamp_Surplus < 55860))
-		{
-			//printf("开盘时间");
-		}
-		else
-		{
-			//printf("休盘时间\n");
-			//休盘时间 直接跳出回调函数
-			return;
-		}
-
-		//是否是停盘最后一分钟
-		bool isLastMinutes = false;
-		if ((nowTimestamp_Surplus >= 9000 && nowTimestamp_Surplus < 9060) ||
-			(nowTimestamp_Surplus >= 41400 && nowTimestamp_Surplus < 41460) ||
-			(nowTimestamp_Surplus >= 55800 && nowTimestamp_Surplus < 55860))
-		{
-			//特殊收盘时间k线不加间隔
-			isLastMinutes = true;
-		}
-
-		//合约标示去除多余字符 并转成大写字符
-		char origin_InstrumentID[31] = "";
-		char InstrumentID[30] = "";
-		strcpy(origin_InstrumentID, pMarketData->InstrumentID);
-		/*char d[5] = { '(', ')', '+' };
-		delAndReplace(origin_InstrumentID, d, '.', '_');
-		strcpy(InstrumentID, origin_InstrumentID);*/
-
-
-		//品种克数计算 影响均价  总额除以总手数
-		int grammage = 1;
-		if (strcmp(origin_InstrumentID, "Ag(T+D)") == 0)
-		{
-			strcpy(InstrumentID, "AGTD");
-		}
-		else if (strcmp(origin_InstrumentID, "Au(T+D)") == 0)
-		{
-			grammage = 1000;
-			strcpy(InstrumentID, "AUTD");
-		}
-		else if (strcmp(origin_InstrumentID, "Au100g") == 0)
-		{
-			grammage = 100;
-			strcpy(InstrumentID, "AU100G");
-		}
-		else if (strcmp(origin_InstrumentID, "mAu(T+D)") == 0)
-		{
-			grammage = 100;
-			strcpy(InstrumentID, "MAUTD");
-		}
-		printf("%sK线种类：%s拼接时间：%s时间戳：%d==\n", prefix, InstrumentID, time_hms, market_Updatetimes);
-
-		//定义并赋值，存储redis行情信息
-		double maxl = pMarketData->HighestPrice;
-		double minl = pMarketData->LowestPrice;
-		double sl = pMarketData->OpenPrice;
-		double el = pMarketData->LastPrice;
-		int v = pMarketData->Volume;
-		double turnover = pMarketData->Turnover;
-
-		//存储信息
-		char myhash[50] = "";
-		char myhash_v[50] = "";
-		char value[200] = "";
-
-		char *nameArray[10] = { "","","" ,"","","" };
-		nameArray[0] = "f1_minutes";
-		nameArray[1] = "f5_minutes";
-		nameArray[2] = "f15_minutes";
-		nameArray[3] = "f30_minutes";
-		nameArray[4] = "f60_minutes";
-		nameArray[5] = "f240_minutes";
-		nameArray[6] = "fenshi_1_minutes";
-		nameArray[7] = "f1_day";
-		nameArray[8] = "f1_week";
-		nameArray[9] = "f1_month";
-
-		int time_interval_local_array[10] = {
-			60,
-			5 * 60,
-			15 * 60,
-			30 * 60,
-			60 * 60,
-			240 * 60,
-			60,
-			24 * 60 * 60,
-			3 * 24 * 60 * 60,
-			32 * 24 * 60 * 60
-		};
-
-		char name[30] = "";
-		int time_interval_local;
-
-		lt = time_t(market_Updatetimes);
-		ptr = localtime(&lt);
-
-		r_lt = time_t(r_Market_Updatetimes);
-		r_ptr = localtime(&r_lt);
-
-		//去除时间戳秒数
-		int ss = int(market_Updatetimes) % int(60);
-		market_Updatetimes = market_Updatetimes - ss;
-
-		r_Market_Updatetimes = r_Market_Updatetimes - ss;
-
-		int r_TempTime = r_Market_Updatetimes - (int(r_Market_Updatetimes) + 28800) % int(86400);
-
-		//程序重启 全局周 月 初始化0 只计算一次周 月成交量
-		if (agtd_week == 0 ||
-			autd_week == 0 ||
-			au100g_week == 0 ||
-			mautd_week == 0)
-		{
-			int st_w = get_time_week(r_lt, r_ptr);
-			//根据日成交量 计算今天之前周成交量
-			int week = get_sum_v(nowDayOfWeek, InstrumentID, st_w);
-
-			week_v = week;
-			if (strcmp(InstrumentID, "AGTD") == 0)
-			{
-				agtd_week = week;
-			}
-			else if (strcmp(InstrumentID, "AUTD") == 0)
-			{
-				autd_week = week;
-			}
-			else if (strcmp(InstrumentID, "AU100G") == 0)
-			{
-				au100g_week = week;
-			}
-			else if (strcmp(InstrumentID, "MAUTD") == 0)
-			{
-				mautd_week = week;
-			}
-		}
-		else
-		{
-			if (strcmp(InstrumentID, "AGTD") == 0)
-			{
-				week_v = agtd_week;
-			}
-			else if (strcmp(InstrumentID, "AUTD") == 0)
-			{
-				week_v = autd_week;
-			}
-			else if (strcmp(InstrumentID, "AU100G") == 0)
-			{
-				week_v = au100g_week;
-			}
-			else if (strcmp(InstrumentID, "MAUTD") == 0)
-			{
-				week_v = mautd_week;
-			}
-		}
-
-		if (agtd_month == 0 ||
-			autd_month == 0 ||
-			au100g_month == 0 ||
-			mautd_month == 0)
-		{
-			//月k
-			int st_m = get_time_month(r_ptr);
-			//根据日成交量 计算今天之前月成交量
-			int month = get_sum_v(nowDayOfMonth, InstrumentID, st_m);
-
-			month_v = month;
-			if (strcmp(InstrumentID, "AGTD") == 0)
-			{
-				agtd_month = month;
-			}
-			else if (strcmp(InstrumentID, "AUTD") == 0)
-			{
-				autd_month = month;
-			}
-			else if (strcmp(InstrumentID, "AU100G") == 0)
-			{
-				au100g_month = month;
-			}
-			else if (strcmp(InstrumentID, "MAUTD") == 0)
-			{
-				mautd_month = month;
-			}
-
-		}
-		else
-		{
-			if (strcmp(InstrumentID, "AGTD") == 0)
-			{
-				month_v = agtd_month;
-			}
-			else if (strcmp(InstrumentID, "AUTD") == 0)
-			{
-				month_v = autd_month;
-			}
-			else if (strcmp(InstrumentID, "AU100G") == 0)
-			{
-				month_v = au100g_month;
-			}
-			else if (strcmp(InstrumentID, "MAUTD") == 0)
-			{
-				month_v = mautd_month;
-			}
-		}
-
-		int endTime = 0;
-		int fenshi_i = 6;//判断分时
-						 //int len = sizeof(nameArray) / sizeof(char*);
-		for (int i = 0; i < 10; ++i)
-		{
-			//设定k线名字和时间间隔
-			strcpy(name, nameArray[i]);
-			sprintf_s(myhash, "%s%s_%s", prefix, InstrumentID, name);
-			sprintf_s(myhash_v, "%s%s_%s_%s", prefix, InstrumentID, name, "CurrentV");
-			time_interval_local = time_interval_local_array[i];
-
-
-			if (i == 4)
-			{
-				//60分钟 K
-				endTime = compare_time_60(market_Updatetimes, time_interval_local, marketDate);
-			}
-			else if (i == 5)
-			{
-				//240分钟 K
-				endTime = compare_time_240(marketDate);
-			}
-			else if (i == 7)
-			{
-				//日 K
-				endTime = r_TempTime;
-			}
-			else if (i == 8)
-			{
-				//周 k
-				//int st = get_time_week(r_lt, r_ptr);
-				////根据日成交量 计算今天之前周成交量
-				//week_v = get_sum_v(nowDayOfWeek, InstrumentID, st);
-
-				//以当前行情时间作为key
-				endTime = r_TempTime;
-			}
-			else if (i == 9)
-			{
-				//月k
-				//int st = get_time_month(r_ptr);
-				////根据日成交量 计算今天之前月成交量
-				//month_v = get_sum_v(nowDayOfMonth, InstrumentID, st);
-
-				//以当前行情时间作为key
-				endTime = r_TempTime;
-			}
-			else
-			{
-				// 1 5 15 30
-				int local = isLastMinutes ? 0 : time_interval_local;
-				endTime = market_Updatetimes + local;
-				endTime = endTime - int(endTime) % int(time_interval_local);
-			}
-
-
-			char str_el[20] = "";
-			sprintf_s(str_el, "%lf", el);
-			//判断
-			if (strlen(str_el) != 0)
-			{
-				reply = (redisReply *)redisCommand(rc, "HKEYS %s", myhash);
-				if (reply &&  reply->elements>0) {
-					//释放HKEYS 的reply 
-					freeReplyObject(reply);
-
-					//获取redis《记录哈希表》中数据 成交量v  用当前行情成交量v 减去记录v 就是这个时间段v的值
-					reply = (redisReply *)redisCommand(rc, "GET %s", myhash_v);
-					if (reply->str == NULL)
-					{
-						printf("redis-获取%s失败", myhash_v);
-						return;
-					}
-					cJSON *root = cJSON_Parse(reply->str);
-					double current_maxl;
-					double current_minl;
-					double current_sl;
-
-					double origin_maxl;
-					double origin_minl;
-					double origin_sl;
-					double origin_el;
-					double origin_turnover;
-
-
-					//判断是否是下个周 月k 间隔不确定 判断
-					bool isNext = false;
-
-					int current_v = cJSON_GetObjectItem(root, "v")->valueint;
-					int max_time = cJSON_GetObjectItem(root, "dated")->valueint;
-					int interval_v = cJSON_GetObjectItem(root, "interval_v")->valueint;
-					origin_el = cJSON_GetObjectItem(root, "el")->valuedouble;
-
-					//收盘价为零 就把上一个收盘价赋值给收盘价 
-					if (el == 0.0)
-					{
-						el = origin_el;
-					}
-
-					if (i == fenshi_i)
-					{
-						origin_turnover = cJSON_GetObjectItem(root, "turnover")->valuedouble;
-					}
-					else
-					{
-						current_maxl = cJSON_GetObjectItem(root, "maxl")->valuedouble;
-						current_minl = cJSON_GetObjectItem(root, "minl")->valuedouble;
-						current_sl = cJSON_GetObjectItem(root, "sl")->valuedouble;
-
-						origin_maxl = current_maxl;
-						origin_minl = current_minl;
-						origin_sl = current_sl;
-
-						current_maxl = current_maxl > el ? current_maxl : el;
-						current_minl = current_minl < el ? current_minl : el;
-					}
-
-					if (i == 9 && max_time != endTime)
-					{
-						lt = time_t(max_time);
-						ptr = localtime(&lt);
-						int max_Month = ptr->tm_mon + 1;
-
-						lt = time_t(endTime);
-						ptr = localtime(&lt);
-						int end_Month = ptr->tm_mon + 1;
-
-						if (max_Month != end_Month)
-						{
-							isNext = true;
-						}
-					}
-					freeReplyObject(reply);
-
-					//新插入数据 是否要更新记录数据
-					int upDateCurrent = true;
-
-					if (endTime - max_time >= time_interval_local || isNext)
-					{
-						int now_time_v = v - interval_v - current_v;
-						//晚8:00 清盘成交量==0；
-						if (now_time_v < 0)
-						{
-							now_time_v = v;
-						}
-
-						if (i == 7)
-						{
-							now_time_v = v;
-						}
-						else if (i == 8)
-						{
-							now_time_v = v + week_v;
-						}
-						else if (i == 9)
-						{
-							now_time_v = v + month_v;
-						}
-
-						//printf("<<v=%d<<<<<interval_v=%d<<<<<current_v=%d<<<<<<<<：%d：>>>>>>>>>>>>>>>>\n", v, interval_v, current_v, now_time_v);
-						if (i == fenshi_i)
-						{
-							float el_meanline = (float)turnover / (v*grammage);
-							sprintf(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, now_time_v, el_meanline, endTime);
-						}
-						else
-						{
-							sprintf(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", el, el, el, el, now_time_v, endTime);
-						}
-						reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, endTime, value);
-						freeReplyObject(reply);
-
-						//更新v
-						if (i == fenshi_i)
-						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"turnover\":%lf,\"dated\":%d}", el, now_time_v, v, turnover, endTime);
-						}
-						else
-						{
-							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", el, el, el, el, now_time_v, v, endTime);
-						}
-						reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
-						freeReplyObject(reply);
-
-						//更新上一个插入值
-						endTime = max_time;
-						//不更新记录值
-						upDateCurrent = false;
-
-
-					}
-					/*else
-					{*/
-					//时间间隔内 update_v = v - interval_v;
-
-					int  update_v;
-					if (i == 7)
-					{
-						update_v = upDateCurrent ? v : current_v;
-					}
-					else if (i == 8)
-					{
-						update_v = upDateCurrent ? v + week_v : current_v;
-					}
-					else if (i == 9)
-					{
-						update_v = upDateCurrent ? v + month_v : current_v;
-					}
-					else
-					{
-						update_v = v - interval_v;
-						if (update_v < 0)
-						{
-							//换一个交易日 则为上个间隔记录值
-							update_v = current_v;
-						}
-					}
-
-					//printf("小于时间间隔内的手数: %d==总手数%d=v_changeNum=%d--sum_el-%f\n\n", v, update_v, v_changeNum, sum_el);
-
-					//更新k线数据（成交量算手数 更新）
-					//有新间隔插入 则除了成交量 其余值全部用原记录值
-					if (upDateCurrent)
-					{
-						if (i == fenshi_i)
-						{
-							float el_meanline = (float)turnover / (v*grammage);
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%f,\"dated\":%d}", el, update_v, el_meanline, endTime);
-						}
-						else
-						{
-							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", current_maxl, current_minl, current_sl, el, update_v, endTime);
-						}
-					}
-					else
-					{
-						if (i == fenshi_i)
-						{
-							float el_meanline = (float)origin_turnover / ((current_v + interval_v)*grammage);
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%f,\"dated\":%d}", origin_el, update_v, el_meanline, endTime);
-						}
-						else
-						{
-							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", origin_maxl, origin_minl, origin_sl, origin_el, update_v, endTime);
-						}
-					}
-
-					reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, max_time, value);
-					freeReplyObject(reply);
-
-					//更新记录数据（开盘价，成交量 不更新）相当于k线数据最后一条
-					if (upDateCurrent)
-					{
-						if (i == fenshi_i)
-						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"turnover\":%lf,\"dated\":%d}", el, update_v, interval_v, turnover, endTime);
-						}
-						else
-						{
-							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", current_maxl, current_minl, current_sl, el, update_v, interval_v, endTime);
-						}
-						reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
-						freeReplyObject(reply);
-
-						//周 月k最后时间戳 需要显示当日时间戳 遇到下周/月 则跳为下周/月 故要删除前一个日时间戳
-						if (i == 8 || i == 9)
-						{
-							if (endTime != max_time)
-							{
-								reply = (redisReply *)redisCommand(rc, "HDEL %s %d", myhash, max_time);
-								freeReplyObject(reply);
-							}
-						}
-					}
-					//}
-					free(root);
-				}
-				else {
-					printf("redisCommand [lrange mylist 0 -1] error:%d. %s\n", reply->type, reply->str);
-					if (reply->str == NULL)
-					{
-						//printf("没有 《记录哈希表》 和 《k线哈希表》\n");
-						//释放HKEYS 的reply 
-						freeReplyObject(reply);
-
-						int tempV = v;
-						if (i == 8)
-						{
-							tempV = tempV + week_v;
-						}
-						else if (i == 9)
-						{
-							tempV = tempV + month_v;
-						}
-
-						//没有 《k线哈希表》 则创建表 并设置各参数默认值
-						//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
-						if (i == fenshi_i)
-						{
-							float el_meanline = (float)turnover / (v*grammage);
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, tempV, el_meanline, endTime);
-						}
-						else
-						{
-							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", el, el, el, el, tempV, endTime);
-						}
-						reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, endTime, value);
-						//printf("第一条哈希表插入信息：HMSET: %s\n\n\n", reply->str);
-						freeReplyObject(reply);
-
-						//记录值默认 都是LastPrice v 和 interval_v 默认总成交量 endTime默认行情去秒数时间
-						if (i == fenshi_i)
-						{
-							sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"turnover\":%lf,\"dated\":%d}", el, v, v, turnover, endTime);
-						}
-						else
-						{
-							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", el, el, el, el, v, v, endTime);
-						}
-						reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
-						//printf("第一条SET: %s\n", reply->str);
-						freeReplyObject(reply);
-					}
-				}
-			}
-			else
-			{
-				printf("品种：==%s==暂无行情数据，不能插入redis\n\n\n", InstrumentID);
-			}
-		}
-
-		//明细
-		char detailName[30] = "fenshi_1_minutes_detail";
-
-		char detail_myhash[50];
-		sprintf_s(detail_myhash, "%s%s_%s", prefix, InstrumentID, detailName);
-
-		reply = (redisReply *)redisCommand(rc, "HKEYS %s", detail_myhash);
-		//printf("=========HKEYS: %d\n", reply->elements);
-		if (reply &&  reply->elements>0) {
-
-			int max_time;
-			int min_time;
-
-			//更新
-			int *array;
-			min_time = atoi(reply->element[0]->str);
-			max_time = atoi(reply->element[0]->str);
-
-			int len = reply->elements;
-			array = (int*)calloc(len, sizeof(int));
-			for (int i = 0; i < len; i++)
-			{
-				array[i] = atoi(reply->element[i]->str);
-				if (array[i] < min_time)
-				{
-					min_time = array[i];
-				}
-
-				if (array[i] > max_time)
-				{
-					max_time = array[i];
-				}
-
-				//printf("i=%d--%d\n", i, array[i]);
-			}
-
-			free(array);
-			//释放HKEYS 的reply 
-			freeReplyObject(reply);
-
-			reply = (redisReply *)redisCommand(rc, "HGET  %s %d", detail_myhash, max_time);
-			if (reply->str == NULL)
-			{
-				return;
-			}
-			cJSON *root = cJSON_Parse(reply->str);
-			int  temInterval_v = cJSON_GetObjectItem(root, "VOL")->valueint;
-			int  total_v = cJSON_GetObjectItem(root, "total_VOL")->valueint;
-
-			int fenshiInterval_v = v - total_v;
-			//printf("最小time=%d--最大time=%d=dds-%d=实时V=%d==最大V=%d==间隔V=%d--\n", min_time, max_time, dds,v, total_v, fenshiInterval_v);
-			freeReplyObject(reply);
-
-			if (fenshiInterval_v != 0 && max_time != dds)
-			{
-				if (len > 19)
-				{
-					//删除最小值
-					//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
-					reply = (redisReply *)redisCommand(rc, "HDEL %s %d %s", detail_myhash, min_time);
-					//printf("删除最小%d---%s\n", min_time, reply->str);
-					freeReplyObject(reply);
-				}
-
-				//插入
-				//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
-				sprintf_s(value, "{\"time\":%d,\"price\":%lf,\"VOL\":%d,\"total_VOL\":%d}", dds, el, fenshiInterval_v, v);
-				reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", detail_myhash, dds, value);
-				//printf("插入实时%d---%s\n", dds, reply->str);
-				freeReplyObject(reply);
-
-			}
-		}
-		else {
-			printf("redisCommand [lrange mylist 0 -1] error:%d. %s\n", reply->type, reply->str);
-			if (reply->str == NULL)
-			{
-				//释放HKEYS 的reply 
-				freeReplyObject(reply);
-
-				//没有 《k线哈希表》 则创建表 并设置各参数默认值
-				//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
-				sprintf_s(value, "{\"time\":%d,\"price\":%lf,\"VOL\":%d,\"total_VOL\":%d}", dds, el, v, v);
-				reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", detail_myhash, dds, value);
-				freeReplyObject(reply);
-			}
-		}
+		HANDLE   hThread;
+		hThread = (HANDLE)_beginthreadex(NULL, 0, &ThreadFunc, pMarketData, 0, NULL);//&param表示传递参数
+		WaitForSingleObject(hThread, INFINITE);
+		CloseHandle(hThread);
 	}
 
 	// 针对用户请求的出错通知
