@@ -18,7 +18,7 @@
 
 #include "Config.h"
 
-#define prefix "t__"
+#define prefix ""
 
 #define NO_QFORKIMPL //这一行必须加才能正常使用
 
@@ -450,7 +450,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	{
 		//printf("休盘时间\n");
 		//休盘时间 直接跳出回调函数
-		_endthreadex(0);
+		//_endthreadex(0);
 		return   0;
 	}
 
@@ -719,7 +719,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 				if (reply->str == NULL)
 				{
 					printf("redis-获取%s失败", myhash_v);
-					_endthreadex(0);
+					//_endthreadex(0);
 					return   0;
 				}
 				cJSON *root = cJSON_Parse(reply->str);
@@ -1023,7 +1023,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 		reply = (redisReply *)redisCommand(rc, "HGET  %s %d", detail_myhash, max_time);
 		if (reply->str == NULL)
 		{
-			_endthreadex(0);
+			//_endthreadex(0);
 			return   0;
 		}
 		cJSON *root = cJSON_Parse(reply->str);
@@ -1069,7 +1069,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 		}
 	}
 
-	_endthreadex(0);
+	//_endthreadex(0);
 	return   0;
 }
 
