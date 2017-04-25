@@ -18,7 +18,7 @@
 
 #include "Config.h"
 
-#define prefix ""
+#define prefix "t__"
 
 #define NO_QFORKIMPL //这一行必须加才能正常使用
 
@@ -27,6 +27,7 @@
 #pragma comment(lib,"ocilibm.lib")
 #pragma comment(lib,"ocilibw.lib")
 using namespace std;
+CRITICAL_SECTION g_cs;
 
 
 HANDLE hMutex;
@@ -74,7 +75,9 @@ int au100g_month;
 int mautd_month;
 
 unsigned   Counter;
-//连接redis
+
+volatile long g_nLoginCount; //登录次数  
+							 //连接redis
 void ConnrectionRedis()
 {
 	// 连接Redis
@@ -375,7 +378,14 @@ void delAndReplace(char *str, char *d, char oldChar, char newChar)
 
 unsigned int __stdcall ThreadFunc(void* pM)
 {
+	//原子锁 防止出现线程丢失
+	InterlockedIncrement((LPLONG)&g_nLoginCount);
+
 	CQdpFtdcDepthMarketDataField *pMarketData = (CQdpFtdcDepthMarketDataField *)pM;
+
+
+	//原子锁 防止出现线程丢失
+	EnterCriticalSection(&g_cs);
 
 	//输出行情
 	//printf_Market(pMarketData);
@@ -786,6 +796,13 @@ unsigned int __stdcall ThreadFunc(void* pM)
 				//新插入数据 是否要更新记录数据
 				int upDateCurrent = true;
 
+				char value_d[200] = "";
+				const char* command1 = NULL;
+				const char* command2 = NULL;
+				const char* command3 = NULL;
+				const char* command4 = NULL;
+				const char* command5 = NULL;
+
 				if (endTime - max_time >= time_interval_local || isNext)
 				{
 					int now_time_v = v - interval_v - current_v;
@@ -818,8 +835,15 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					{
 						sprintf(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", el, el, el, el, now_time_v, endTime);
 					}
-					reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, endTime, value);
-					freeReplyObject(reply);
+					/*reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, endTime, value);
+					if (NULL == reply)
+					{
+					cout << "exe command fail" <<value<< endl;
+					}
+					freeReplyObject(reply);*/
+					sprintf_s(value_d, "HMSET %s %d %s", myhash, endTime, value);
+					command1 = value_d;
+					redisAppendCommand(rc, command1);
 
 					//更新v
 					if (i == fenshi_i)
@@ -830,15 +854,18 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					{
 						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", el, el, el, el, now_time_v, v, endTime);
 					}
-					reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
-					freeReplyObject(reply);
+					/*reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
+					freeReplyObject(reply);*/
+
+					sprintf_s(value_d, "SET %s %s", myhash_v, value);
+					command2 = value_d;
+					redisAppendCommand(rc, command2);
+
 
 					//更新上一个插入值
 					endTime = max_time;
 					//不更新记录值
 					upDateCurrent = false;
-
-
 				}
 				/*else
 				{*/
@@ -896,8 +923,12 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					}
 				}
 
-				reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, max_time, value);
-				freeReplyObject(reply);
+				/*reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, max_time, value);
+				freeReplyObject(reply);*/
+
+				sprintf_s(value_d, "HMSET %s %d %s", myhash, max_time, value);
+				command3 = value_d;
+				redisAppendCommand(rc, command3);
 
 				//更新记录数据（开盘价，成交量 不更新）相当于k线数据最后一条
 				if (upDateCurrent)
@@ -910,19 +941,68 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					{
 						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", current_maxl, current_minl, current_sl, el, update_v, interval_v, endTime);
 					}
-					reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
-					freeReplyObject(reply);
+					/*reply = (redisReply *)redisCommand(rc, "SET %s %s", myhash_v, value);
+					freeReplyObject(reply);*/
+
+					sprintf_s(value_d, "SET %s %s", myhash_v, value);
+					command4 = value_d;
+					redisAppendCommand(rc, command4);
 
 					//周 月k最后时间戳 需要显示当日时间戳 遇到下周/月 则跳为下周/月 故要删除前一个日时间戳
 					if (i == 8 || i == 9)
 					{
 						if (endTime != max_time)
 						{
-							reply = (redisReply *)redisCommand(rc, "HDEL %s %d", myhash, max_time);
-							freeReplyObject(reply);
+							/*reply = (redisReply *)redisCommand(rc, "HDEL %s %d", myhash, max_time);
+							freeReplyObject(reply);*/
+
+							sprintf_s(value_d, "HDEL %s %d", myhash, max_time);
+							command5 = value_d;
+							redisAppendCommand(rc, command5);
 						}
 					}
 				}
+				if (command1 != NULL)
+				{
+					if (REDIS_OK != redisGetReply(rc, (void**)&reply)) {
+						printf("Failed to execute command[%s] with Pipeline.\n", command1);
+						freeReplyObject(reply);
+					}
+					freeReplyObject(reply);
+				}
+				if (command2 != NULL)
+				{
+					if (REDIS_OK != redisGetReply(rc, (void**)&reply)) {
+						printf("Failed to execute command[%s] with Pipeline.\n", command2);
+						freeReplyObject(reply);
+					}
+					freeReplyObject(reply);
+				}
+				if (command3 != NULL)
+				{
+					if (REDIS_OK != redisGetReply(rc, (void**)&reply)) {
+						printf("Failed to execute command[%s] with Pipeline.\n", command3);
+						freeReplyObject(reply);
+					}
+					freeReplyObject(reply);
+				}
+				if (command4 != NULL)
+				{
+					if (REDIS_OK != redisGetReply(rc, (void**)&reply)) {
+						printf("Failed to execute command[%s] with Pipeline.\n", command4);
+						freeReplyObject(reply);
+					}
+					freeReplyObject(reply);
+				}
+				if (command5 != NULL)
+				{
+					if (REDIS_OK != redisGetReply(rc, (void**)&reply)) {
+						printf("Failed to execute command[%s] with Pipeline.\n", command5);
+						freeReplyObject(reply);
+					}
+					freeReplyObject(reply);
+				}
+
 				//}
 				free(root);
 			}
@@ -1036,21 +1116,51 @@ unsigned int __stdcall ThreadFunc(void* pM)
 
 		if (fenshiInterval_v != 0 && max_time != dds)
 		{
+			char value_d[200] = "";
+			const char* command1 = NULL;
+			const char* command2 = NULL;
+
 			if (len > 19)
 			{
 				//删除最小值
 				//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
-				reply = (redisReply *)redisCommand(rc, "HDEL %s %d", detail_myhash, min_time);
-				//printf("删除最小%d---%s\n", min_time, reply->str);
-				freeReplyObject(reply);
+				//reply = (redisReply *)redisCommand(rc, "HDEL %s %d", detail_myhash, min_time);
+				////printf("删除最小%d---%s\n", min_time, reply->str);
+				//freeReplyObject(reply);
+
+				sprintf_s(value_d, "HDEL %s %d", detail_myhash, min_time);
+				command1 = value_d;
+				redisAppendCommand(rc, command1);
 			}
 
 			//插入
 			//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
 			sprintf_s(value, "{\"time\":%d,\"price\":%lf,\"VOL\":%d,\"total_VOL\":%d}", dds, el, fenshiInterval_v, v);
-			reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", detail_myhash, dds, value);
-			//printf("插入实时%d---%s\n", dds, reply->str);
-			freeReplyObject(reply);
+			//reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", detail_myhash, dds, value);
+			////printf("插入实时%d---%s\n", dds, reply->str);
+			//freeReplyObject(reply);
+
+			sprintf_s(value_d, "HMSET %s %d %s", detail_myhash, dds, value);
+			command2 = value_d;
+			redisAppendCommand(rc, command2);
+
+
+			if (command1 != NULL)
+			{
+				if (REDIS_OK != redisGetReply(rc, (void**)&reply)) {
+					printf("Failed to execute command[%s] with Pipeline.\n", command1);
+					freeReplyObject(reply);
+				}
+				freeReplyObject(reply);
+			}
+			if (command2 != NULL)
+			{
+				if (REDIS_OK != redisGetReply(rc, (void**)&reply)) {
+					printf("Failed to execute command[%s] with Pipeline.\n", command2);
+					freeReplyObject(reply);
+				}
+				freeReplyObject(reply);
+			}
 
 		}
 	}
@@ -1070,6 +1180,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	}
 
 	//_endthreadex(0);
+	LeaveCriticalSection(&g_cs);
 	return   0;
 }
 
@@ -1257,10 +1368,39 @@ public:
 	// 深度行情通知，行情服务器会主动通知客户端
 	void OnRtnDepthMarketData(CQdpFtdcDepthMarketDataField *pMarketData)
 	{
-		HANDLE   hThread;
-		hThread = (HANDLE)_beginthreadex(NULL, 0, &ThreadFunc, pMarketData, 0, NULL);//&param表示传递参数
-		WaitForSingleObject(hThread, INFINITE);
-		CloseHandle(hThread);
+		//HANDLE   hThread[1];
+		//hThread[0] = (HANDLE)_beginthreadex(NULL, 0, &ThreadFunc, pMarketData, 0, NULL);//&param表示传递参数
+		//ResumeThread(hThread);
+		//WaitForSingleObject(hThread[0], 1000);
+		////int rval = WaitForMultipleObjects(1, hThread, false, INFINITE);
+		////cout << "-" << rval << endl;
+		//CloseHandle(hThread[0]);
+
+		//HANDLE   hth1;
+		//unsigned  uiThread1ID;
+		//hth1 = (HANDLE)_beginthreadex(NULL,         // security  
+		//	0,            // stack size  
+		//	&ThreadFunc,
+		//	pMarketData,           // arg list  
+		//	CREATE_SUSPENDED,  // so we can later call ResumeThread()  
+		//	&uiThread1ID);
+		//if (hth1 == 0)
+		//	printf("Failed to create thread 1\n");
+		////DWORD   dwExitCode;
+		////GetExitCodeThread(hth1, &dwExitCode);  // should be STILL_ACTIVE = 0x00000103 = 259  
+		////printf("initial thread 1 exit code = %u\n", dwExitCode);
+		//ResumeThread(hth1);   // serves the purpose of Jaeschke's t1->Start()  
+		//WaitForSingleObject(hth1, INFINITE);
+		//CloseHandle( hth1 );  
+
+
+
+		HANDLE handle[1];
+		InitializeCriticalSection(&g_cs);   //  
+		handle[0] = (HANDLE)_beginthreadex(NULL, 0, &ThreadFunc, pMarketData, 0, NULL);
+		WaitForMultipleObjects(1, handle, TRUE, INFINITE);
+		CloseHandle(handle[0]);
+		DeleteCriticalSection(&g_cs);
 	}
 
 	// 针对用户请求的出错通知
