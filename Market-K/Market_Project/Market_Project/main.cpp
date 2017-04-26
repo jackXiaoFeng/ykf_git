@@ -378,13 +378,9 @@ void delAndReplace(char *str, char *d, char oldChar, char newChar)
 
 unsigned int __stdcall ThreadFunc(void* pM)
 {
-	//原子锁 防止出现线程丢失
-	InterlockedIncrement((LPLONG)&g_nLoginCount);
-
 	CQdpFtdcDepthMarketDataField *pMarketData = (CQdpFtdcDepthMarketDataField *)pM;
 
-
-	//原子锁 防止出现线程丢失
+	//临界区
 	EnterCriticalSection(&g_cs);
 
 	//输出行情
@@ -472,6 +468,15 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	{
 		//特殊收盘时间k线不加间隔
 		isLastMinutes = true;
+	}
+
+	//是否是盘中开盘一分钟（不包括晚20:00 开盘） 
+	bool isStarMinutes = false;
+	if ((nowTimestamp_Surplus >= 32400 && nowTimestamp_Surplus < 32460) ||
+		(nowTimestamp_Surplus >= 48600 && nowTimestamp_Surplus < 48660))
+	{
+		//按照 开盘前的成交量计算 确保开盘成交量准确性
+		isStarMinutes = true;
 	}
 
 	//合约标示去除多余字符 并转成大写字符
@@ -809,7 +814,15 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					//晚8:00 清盘成交量==0；
 					if (now_time_v < 0)
 					{
-						now_time_v = v;
+						if ((nowTimestamp_Surplus >= 72000 && nowTimestamp_Surplus < 72060))
+						{
+							now_time_v = 0;
+							v = 0;
+						}
+						else
+						{
+							now_time_v = v;
+						}
 					}
 
 					if (i == 7)
@@ -844,6 +857,9 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					sprintf_s(value_d, "HMSET %s %d %s", myhash, endTime, value);
 					command1 = value_d;
 					redisAppendCommand(rc, command1);
+
+
+					v = isStarMinutes ? interval_v + current_v : v;
 
 					//更新v
 					if (i == fenshi_i)
@@ -896,7 +912,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 
 				//printf("小于时间间隔内的手数: %d==总手数%d=v_changeNum=%d--sum_el-%f\n\n", v, update_v, v_changeNum, sum_el);
 
-				//更新k线数据（成交量算手数 更新）
+				//更新k线数据（成交量算手数 更新1
 				//有新间隔插入 则除了成交量 其余值全部用原记录值
 				if (upDateCurrent)
 				{
@@ -1171,8 +1187,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 			//释放HKEYS 的reply 
 			freeReplyObject(reply);
 
-			//没有 《k线哈希表》 则创建表 并设置各参数默认值
-			//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
+			//记录值默认LastPrice v默认总成交量 endTime默认行情去秒数时间
 			sprintf_s(value, "{\"time\":%d,\"price\":%lf,\"VOL\":%d,\"total_VOL\":%d}", dds, el, v, v);
 			reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", detail_myhash, dds, value);
 			freeReplyObject(reply);
