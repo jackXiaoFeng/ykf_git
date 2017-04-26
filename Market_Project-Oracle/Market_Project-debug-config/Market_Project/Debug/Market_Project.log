@@ -1,6 +1,9 @@
 ﻿  cJSON.c
+  MyLogger.cpp
+  You are not using DLL C run time library. You must call log4cplus::initialize() once before you use any other log4cplus API.
   main.cpp
-g:\ykf_git\market_project-oracle\market_project-debug-config\market_project\main.cpp(658): warning C4244: “初始化”: 从“time_t”转换到“int”，可能丢失数据
+  You are not using DLL C run time library. You must call log4cplus::initialize() once before you use any other log4cplus API.
+g:\ykf_git\market_project-oracle\market_project-debug-config\market_project\main.cpp(672): warning C4244: “初始化”: 从“time_t”转换到“int”，可能丢失数据
   DBOperation.cpp
   Confi.cpp
   正在生成代码...

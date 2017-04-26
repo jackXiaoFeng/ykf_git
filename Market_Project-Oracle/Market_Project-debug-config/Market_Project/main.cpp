@@ -16,7 +16,7 @@
 #include <hiredis.h>
 #include <ocilib.h>
 #include "cJSON.h"
-
+#include "MyLogger.h"
 #include "Config.h"
 
 #define NO_QFORKIMPL //这一行必须加才能正常使用
@@ -48,6 +48,9 @@ using namespace std;
 //
 //#endif 
 
+CRITICAL_SECTION g_cs;
+
+MyLogger * myLoger;
 
 //k线间隔
 
@@ -327,6 +330,10 @@ void delAndReplace(char str[], char d[], char oldChar, char newChar)
 unsigned int __stdcall ThreadFunc(void* pM)
 {
 	CQdpFtdcDepthMarketDataField *pMarketData = (CQdpFtdcDepthMarketDataField *)pM;
+
+	//临界区
+	EnterCriticalSection(&g_cs);
+
 	//输出行情
 	//printf_Market(pMarketData);
 
@@ -527,6 +534,9 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	else
 	{
 		printf("插入历史数据-%s--失败\n", pMarketData->InstrumentID);
+		char value[200] = "";
+		sprintf(value, "插入历史数据-%s--失败\n", pMarketData->InstrumentID);
+		LOG4CPLUS_FATAL(myLoger->logger, value);
 	}
 
 	char str_el[20] = "";
@@ -604,6 +614,10 @@ unsigned int __stdcall ThreadFunc(void* pM)
 
 		reply = (redisReply *)redisCommand(rc, "HMSET ALL_InstrumentID %s %s", InstrumentID, value);
 		//printf("哈希表插入信息：HMSET: %s\n\n", reply->str);
+		if (reply == NULL) {
+			
+			LOG4CPLUS_FATAL(myLoger->logger, "HMSET ALL_InstrumentID Failed to execute command");
+		}
 		freeReplyObject(reply);
 	}
 	else
@@ -611,7 +625,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 		printf("品种：==%s==暂无行情数据，不能插入redis\n\n\n", InstrumentID);
 	}
 
-	_endthreadex(0);
+	LeaveCriticalSection(&g_cs);
 	return   0;
 }
 
@@ -657,14 +671,18 @@ public:
 		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d %H:%M:%S ", ptr);
 		int now = time(NULL);
 		char value[200] = "";
-		sprintf(value, "{\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
-		reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", "hq_tcp_login_Log", now, value);
-		freeReplyObject(reply);
+		sprintf(value, "当客户端发出登录请求之后，该方法会被调用，通知客户端登录是否成功{\ntime:%d\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", now, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+
+		LOG4CPLUS_WARN(myLoger->logger, value);
 
 		if (pRspInfo->ErrorID != 0)
 		{
 			// 端登失败，客户端需进行错误处理
 			printf("Failed to login, errorcode=%d errormsg=%s requestid=%d chain=%d", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+			char value[500] = "";
+			sprintf(value, "端登失败，客户端需进行错误处理\nFailed to login, errorcode=%d errormsg=%s requestid=%d chain=%d", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+			LOG4CPLUS_ERROR(myLoger->logger, value);
+
 			return;
 		}
 		char * contracts[19] = { "","","" ,"" ,"","","","","","","","","","","","","","","" };
@@ -788,10 +806,17 @@ public:
 	// 深度行情通知，行情服务器会主动通知客户端
 	void OnRtnDepthMarketData(CQdpFtdcDepthMarketDataField *pMarketData)
 	{
-		HANDLE   hThread;
-		hThread = (HANDLE)_beginthreadex(NULL, 0, &ThreadFunc, pMarketData, 0, NULL);//&param表示传递参数
-		WaitForSingleObject(hThread, INFINITE);
-		CloseHandle(hThread);
+		//HANDLE   hThread;
+		//hThread = (HANDLE)_beginthreadex(NULL, 0, &ThreadFunc, pMarketData, 0, NULL);//&param表示传递参数
+		//WaitForSingleObject(hThread, INFINITE);
+		//CloseHandle(hThread);
+
+		HANDLE handle[1];
+		InitializeCriticalSection(&g_cs);   //  
+		handle[0] = (HANDLE)_beginthreadex(NULL, 0, &ThreadFunc, pMarketData, 0, NULL);
+		WaitForMultipleObjects(1, handle, TRUE, INFINITE);
+		CloseHandle(handle[0]);
+		DeleteCriticalSection(&g_cs);
 	}
 
 	// 针对用户请求的出错通知
@@ -802,6 +827,9 @@ public:
 		printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
 		// 客户端需进行错误处理
 
+		char value[500] = "";
+		sprintf(value, "针对用户请求的出错通知 ErrorCode = [%d], ErrorMsg = [%s]\nRequestID=[%d], Chain=[%d]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+		LOG4CPLUS_ERROR(myLoger->logger, value);
 
 		// 释放rc资源
 		redisFree(rc);
@@ -889,6 +917,9 @@ int main(int   argc, char*   argv[])
 	//	exit(0);
 	//	//return 0;
 	//}
+	//log 日志
+	myLoger = NULL;
+	myLoger = MyLogger::getInstance();
 
 	char buf[1000];
 	GetCurrentDirectory(1000, buf);  //得到当前工作路径
@@ -925,8 +956,6 @@ int main(int   argc, char*   argv[])
 		cout << "Uanble to open the file\n";
 		return 0;
 	}
-
-
 
 
 	//market
