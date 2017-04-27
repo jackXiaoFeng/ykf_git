@@ -18,7 +18,7 @@
 
 #include "Config.h"
 
-#define prefix "t__"
+#define prefix ""
 
 #define NO_QFORKIMPL //这一行必须加才能正常使用
 
@@ -375,7 +375,88 @@ void delAndReplace(char *str, char *d, char oldChar, char newChar)
 //	_endthreadex(0);
 //	return   0;
 //}
+//输出行情信息
+void printf_Market(CQdpFtdcDepthMarketDataField *pMarketData)
+{
+	// 客户端按需处理返回的数据
+	printf(
+		"\n<<<<<< \n交易日:%s,  结算组代码:%s,  结算编号:%d,\
+            \n合约代码:%s,  最后修改时间:%s,  最后修改毫秒:%d,  交易所代码:%s，\
+            \n昨结算:%f,  昨收盘:%f,  昨持仓量:%f,  昨虚实度:%f,\
+            \n今开盘:%f,  最高价:%f,  最低价:%f,  今收盘:%f,\
+            \n涨停板价:%f,  跌停板价:%f,  今结算:%f,  今虚实度:%f,\
+            \n最新价:%f,  数量:%d,  成交金额:%f,  持仓量:%f,\
+            \n申买价一:%f,  申买量一:%d,  申卖价一:%f,  申卖量一:%d,\
+            \n申买价二:%f,  申买量二:%d,  申卖价二:%f,  申卖量二:%d,\
+            \n申买价三:%f,  申买量三:%d,  申卖价三:%f,  申卖量三:%d,\
+            \n申买价四:%f,  申买量四:%d,  申卖价四:%f,  申卖量四:%d,\
+            \n申买价五:%f,  申买量五:%d,  申卖价五:%f,  申卖量五:%d,\n>>>>>\
+            \n\n",
 
+		//交易
+		pMarketData->TradingDay,
+		pMarketData->SettlementGroupID,
+		pMarketData->SettlementID,
+
+		pMarketData->InstrumentID,
+		pMarketData->UpdateTime,
+		pMarketData->UpdateMillisec,
+		pMarketData->ExchangeID,
+
+		//昨
+		pMarketData->PreSettlementPrice,
+		pMarketData->PreClosePrice,
+		pMarketData->PreOpenInterest,
+		pMarketData->PreDelta,
+
+		//今
+		pMarketData->OpenPrice,
+		pMarketData->HighestPrice,
+		pMarketData->LowestPrice,
+		pMarketData->ClosePrice,
+
+		pMarketData->UpperLimitPrice,
+		pMarketData->LowerLimitPrice,
+		pMarketData->SettlementPrice,
+		pMarketData->CurrDelta,
+
+		//其他
+		pMarketData->LastPrice,
+		pMarketData->Volume,
+		pMarketData->Turnover,
+		pMarketData->OpenInterest,
+
+		//申一
+		pMarketData->BidPrice1,
+		pMarketData->BidVolume1,
+		pMarketData->AskPrice1,
+		pMarketData->AskVolume1,
+
+		//二
+		pMarketData->BidPrice2,
+		pMarketData->BidVolume2,
+		pMarketData->AskPrice2,
+		pMarketData->AskVolume2,
+
+		//三
+		pMarketData->BidPrice3,
+		pMarketData->BidVolume3,
+		pMarketData->AskPrice3,
+		pMarketData->AskVolume3,
+
+		//四
+		pMarketData->BidPrice4,
+		pMarketData->BidVolume4,
+		pMarketData->AskPrice4,
+		pMarketData->AskVolume4,
+
+		//五
+		pMarketData->BidPrice5,
+		pMarketData->BidVolume5,
+		pMarketData->AskPrice5,
+		pMarketData->AskVolume5
+	);
+}
 unsigned int __stdcall ThreadFunc(void* pM)
 {
 	CQdpFtdcDepthMarketDataField *pMarketData = (CQdpFtdcDepthMarketDataField *)pM;
@@ -446,9 +527,9 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	nowTimestamp_Zero = dds - nowTimestamp_Surplus;
 
 	//停盘时间加一分钟 是为了结束时30:00减去前一个时间段 算出成交量
-	if ((nowTimestamp_Surplus > 72000 || nowTimestamp_Surplus < 9060) ||
-		(nowTimestamp_Surplus >32400 && nowTimestamp_Surplus < 41460) ||
-		(nowTimestamp_Surplus >48600 && nowTimestamp_Surplus < 55860))
+	if ((nowTimestamp_Surplus >= 72000 || nowTimestamp_Surplus < 9060) ||
+		(nowTimestamp_Surplus >=32400 && nowTimestamp_Surplus < 41460) ||
+		(nowTimestamp_Surplus >=48600 && nowTimestamp_Surplus < 55860))
 	{
 		//printf("开盘时间");
 	}
@@ -1297,88 +1378,7 @@ public:
 		//contracts[18] = "u(T+D)_Deli";
 		m_pUserApi->SubMarketData(contracts, 4);
 	}
-	//输出行情信息
-	void printf_Market(CQdpFtdcDepthMarketDataField *pMarketData)
-	{
-		// 客户端按需处理返回的数据
-		printf(
-			"\n<<<<<< \n交易日:%s,  结算组代码:%s,  结算编号:%d,\
-            \n合约代码:%s,  最后修改时间:%s,  最后修改毫秒:%d,  交易所代码:%s，\
-            \n昨结算:%f,  昨收盘:%f,  昨持仓量:%f,  昨虚实度:%f,\
-            \n今开盘:%f,  最高价:%f,  最低价:%f,  今收盘:%f,\
-            \n涨停板价:%f,  跌停板价:%f,  今结算:%f,  今虚实度:%f,\
-            \n最新价:%f,  数量:%d,  成交金额:%f,  持仓量:%f,\
-            \n申买价一:%f,  申买量一:%d,  申卖价一:%f,  申卖量一:%d,\
-            \n申买价二:%f,  申买量二:%d,  申卖价二:%f,  申卖量二:%d,\
-            \n申买价三:%f,  申买量三:%d,  申卖价三:%f,  申卖量三:%d,\
-            \n申买价四:%f,  申买量四:%d,  申卖价四:%f,  申卖量四:%d,\
-            \n申买价五:%f,  申买量五:%d,  申卖价五:%f,  申卖量五:%d,\n>>>>>\
-            \n\n",
-
-			//交易
-			pMarketData->TradingDay,
-			pMarketData->SettlementGroupID,
-			pMarketData->SettlementID,
-
-			pMarketData->InstrumentID,
-			pMarketData->UpdateTime,
-			pMarketData->UpdateMillisec,
-			pMarketData->ExchangeID,
-
-			//昨
-			pMarketData->PreSettlementPrice,
-			pMarketData->PreClosePrice,
-			pMarketData->PreOpenInterest,
-			pMarketData->PreDelta,
-
-			//今
-			pMarketData->OpenPrice,
-			pMarketData->HighestPrice,
-			pMarketData->LowestPrice,
-			pMarketData->ClosePrice,
-
-			pMarketData->UpperLimitPrice,
-			pMarketData->LowerLimitPrice,
-			pMarketData->SettlementPrice,
-			pMarketData->CurrDelta,
-
-			//其他
-			pMarketData->LastPrice,
-			pMarketData->Volume,
-			pMarketData->Turnover,
-			pMarketData->OpenInterest,
-
-			//申一
-			pMarketData->BidPrice1,
-			pMarketData->BidVolume1,
-			pMarketData->AskPrice1,
-			pMarketData->AskVolume1,
-
-			//二
-			pMarketData->BidPrice2,
-			pMarketData->BidVolume2,
-			pMarketData->AskPrice2,
-			pMarketData->AskVolume2,
-
-			//三
-			pMarketData->BidPrice3,
-			pMarketData->BidVolume3,
-			pMarketData->AskPrice3,
-			pMarketData->AskVolume3,
-
-			//四
-			pMarketData->BidPrice4,
-			pMarketData->BidVolume4,
-			pMarketData->AskPrice4,
-			pMarketData->AskVolume4,
-
-			//五
-			pMarketData->BidPrice5,
-			pMarketData->BidVolume5,
-			pMarketData->AskPrice5,
-			pMarketData->AskVolume5
-		);
-	}
+	
 
 	// 深度行情通知，行情服务器会主动通知客户端
 	void OnRtnDepthMarketData(CQdpFtdcDepthMarketDataField *pMarketData)
