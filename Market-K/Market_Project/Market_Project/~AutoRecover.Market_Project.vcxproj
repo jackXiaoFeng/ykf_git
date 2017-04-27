@@ -70,7 +70,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LibraryPath>G:\Market\Market_Project\lib;$(LibraryPath)</LibraryPath>
-    <IncludePath>G:\Market\Market_Project\include\src\Win32_Interop;G:\Market\Market_Project\include\hiredis;$(IncludePath)</IncludePath>
+    <IncludePath>G:\ykf_git\Market-K\Market_Project\include;G:\Market\Market_Project\include\src\Win32_Interop;G:\Market\Market_Project\include\hiredis;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -82,7 +82,7 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>qdpmdapi.lib;ociliba.lib;ocilibm.lib;ocilibw.lib;hiredis.lib;Win32_Interop.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>qdpmdapi.lib;ociliba.lib;ocilibm.lib;ocilibw.lib;hiredis.lib;Win32_Interop.lib;log4cplusD.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -128,11 +128,13 @@
     <ClCompile Include="Confi.cpp" />
     <ClCompile Include="DBOperation.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MyLogger.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cJSON.h" />
     <ClInclude Include="Config.h" />
     <ClInclude Include="DBOperation.h" />
+    <ClInclude Include="MyLogger.h" />
     <ClInclude Include="QdpFtdcMdApi.h" />
     <ClInclude Include="QdpFtdcUserApiDataType.h" />
     <ClInclude Include="QdpFtdcUserApiStruct.h" />

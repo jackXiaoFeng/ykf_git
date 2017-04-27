@@ -15,7 +15,7 @@
 #include <hiredis.h>
 #include <ocilib.h>
 #include "cJSON.h"
-
+#include "MyLogger.h"
 #include "Config.h"
 
 #define prefix ""
@@ -29,6 +29,7 @@
 using namespace std;
 CRITICAL_SECTION g_cs;
 
+MyLogger * myLoger;
 
 HANDLE hMutex;
 CDBOperation dbOper;
@@ -1328,6 +1329,10 @@ public:
 		reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", name, now, value);
 		freeReplyObject(reply);
 
+		sprintf(value, "当客户端发出登录请求之后，该方法会被调用，通知客户端登录是否成功{\ntime:%d\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", now, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+
+		LOG4CPLUS_WARN(myLoger->logger, value);
+
 		if (pRspInfo->ErrorID != 0)
 		{
 			// 端登失败，客户端需进行错误处理
@@ -1425,6 +1430,9 @@ public:
 		printf("ErrorCode=[%d], ErrorMsg=[%s]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg);
 		printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
 		// 客户端需进行错误处理
+		char value[500] = "";
+		sprintf(value, "针对用户请求的出错通知 ErrorCode = [%d], ErrorMsg = [%s]\nRequestID=[%d], Chain=[%d]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+		LOG4CPLUS_ERROR(myLoger->logger, value);
 
 		// 释放rc资源
 		redisFree(rc);
@@ -1477,6 +1485,9 @@ int main()
 	//	exit(0);
 	//	//return 0;
 	//}
+	//log 日志
+	myLoger = NULL;
+	myLoger = MyLogger::getInstance();
 
 	//market
 	std::string c_marketAddress;
