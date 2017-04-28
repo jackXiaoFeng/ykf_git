@@ -18,7 +18,7 @@
 #include "MyLogger.h"
 #include "Config.h"
 
-#define prefix ""
+#define prefix "t__"
 
 #define NO_QFORKIMPL //这一行必须加才能正常使用
 
@@ -76,8 +76,6 @@ int au100g_month;
 int mautd_month;
 
 unsigned   Counter;
-
-volatile long g_nLoginCount; //登录次数  
 							 //连接redis
 void ConnrectionRedis()
 {
@@ -488,11 +486,13 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	strcat(market_time_str, time_hms);
 	int market_Updatetimes = (int)StringToDatetime(market_time_str);
 
-	//因行情时间有延迟 故在23:59:59秒 拼接的时候会出现本地日期已经过一天 行情时间还是上一天的bug 所以判断如果行情时间戳大于本地时间戳和大于不只一秒条件 就减去一个交易日
+	//因行情时间有延迟 故在23:59:59秒 拼接的时候会出现本地日期已经过一天 行情时间还是上一天的bug 所以判断如果行情时间戳大于本地时间戳和大于不只一秒条件 就减去一个交易日  但是日周月k则不必减去直接就给取余数不影响
 	int now = (int)lt;
+	bool isDayChange = false;
 	if (market_Updatetimes > now && (market_Updatetimes - now) > 60)
 	{
 		market_Updatetimes -= 24 * 60 * 60;
+		isDayChange = true;
 	}
 
 	//行情日期+行情时分秒 用于计算日/周/月k
@@ -500,7 +500,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	strcpy(marketDate, pMarketData->TradingDay);
 	sprintf_s(marketDate, "%s-%s-%s", substring(marketDate, 0, 4), substring(marketDate, 4, 2), substring(marketDate, 6, 2));
 
-	if (strcmp(marketDate, nowtDate) != 0)
+	if ((strcmp(marketDate, nowtDate) != 0)|| isDayChange)
 	{
 		strcpy(r_Market_time_str, marketDate);
 		strcat(r_Market_time_str, " ");
