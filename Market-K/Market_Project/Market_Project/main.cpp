@@ -18,7 +18,7 @@
 #include "MyLogger.h"
 #include "Config.h"
 
-#define prefix "t__"
+#define prefix ""
 
 #define NO_QFORKIMPL //这一行必须加才能正常使用
 
