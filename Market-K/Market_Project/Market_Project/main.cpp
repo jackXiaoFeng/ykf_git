@@ -76,7 +76,7 @@ int au100g_month;
 int mautd_month;
 
 unsigned   Counter;
-							 //连接redis
+//连接redis
 void ConnrectionRedis()
 {
 	// 连接Redis
@@ -500,7 +500,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	strcpy(marketDate, pMarketData->TradingDay);
 	sprintf_s(marketDate, "%s-%s-%s", substring(marketDate, 0, 4), substring(marketDate, 4, 2), substring(marketDate, 6, 2));
 
-	if ((strcmp(marketDate, nowtDate) != 0)|| isDayChange)
+	if ((strcmp(marketDate, nowtDate) != 0) || isDayChange)
 	{
 		strcpy(r_Market_time_str, marketDate);
 		strcat(r_Market_time_str, " ");
@@ -529,8 +529,8 @@ unsigned int __stdcall ThreadFunc(void* pM)
 
 	//停盘时间加一分钟 是为了结束时30:00减去前一个时间段 算出成交量
 	if ((nowTimestamp_Surplus >= 72000 || nowTimestamp_Surplus < 9060) ||
-		(nowTimestamp_Surplus >=32400 && nowTimestamp_Surplus < 41460) ||
-		(nowTimestamp_Surplus >=48600 && nowTimestamp_Surplus < 55860))
+		(nowTimestamp_Surplus >= 32400 && nowTimestamp_Surplus < 41460) ||
+		(nowTimestamp_Surplus >= 48600 && nowTimestamp_Surplus < 55860))
 	{
 		//printf("开盘时间");
 	}
@@ -574,21 +574,22 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	int grammage = 1;
 	if (strcmp(origin_InstrumentID, "Ag(T+D)") == 0)
 	{
+		grammage = 100;
 		strcpy(InstrumentID, "AGTD");
 	}
 	else if (strcmp(origin_InstrumentID, "Au(T+D)") == 0)
 	{
-		grammage = 1000;
+		grammage = 100000;
 		strcpy(InstrumentID, "AUTD");
 	}
 	else if (strcmp(origin_InstrumentID, "Au100g") == 0)
 	{
-		grammage = 100;
+		grammage = 10000;
 		strcpy(InstrumentID, "AU100G");
 	}
 	else if (strcmp(origin_InstrumentID, "mAu(T+D)") == 0)
 	{
-		grammage = 100;
+		grammage = 10000;
 		strcpy(InstrumentID, "MAUTD");
 	}
 	printf("%sK线种类：%s拼接时间：%s时间戳：%d==\n", prefix, InstrumentID, time_hms, market_Updatetimes);
@@ -819,6 +820,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					//_endthreadex(0);
 					return   0;
 				}
+				printf("redis-获取%s\n", reply->str);
 				cJSON *root = cJSON_Parse(reply->str);
 				double current_maxl;
 				double current_minl;
@@ -923,7 +925,16 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					//printf("<<v=%d<<<<<interval_v=%d<<<<<current_v=%d<<<<<<<<：%d：>>>>>>>>>>>>>>>>\n", v, interval_v, current_v, now_time_v);
 					if (i == fenshi_i)
 					{
-						float el_meanline = (float)turnover / (v*grammage);
+						float el_meanline;
+						if (turnover == 0)
+						{
+							el_meanline = pMarketData->PreClosePrice;
+						}
+						else
+						{
+							el_meanline = (float)(turnover / v);
+							el_meanline = el_meanline / grammage;
+						}
 						sprintf(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, now_time_v, el_meanline, endTime);
 					}
 					else
@@ -1000,7 +1011,16 @@ unsigned int __stdcall ThreadFunc(void* pM)
 				{
 					if (i == fenshi_i)
 					{
-						float el_meanline = (float)turnover / (v*grammage);
+						float el_meanline;
+						if (turnover == 0)
+						{
+							el_meanline = pMarketData->PreClosePrice;
+						}
+						else
+						{
+							el_meanline = (float)(turnover / v);
+							el_meanline = el_meanline / grammage;
+						}
 						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%f,\"dated\":%d}", el, update_v, el_meanline, endTime);
 					}
 					else
@@ -1012,7 +1032,16 @@ unsigned int __stdcall ThreadFunc(void* pM)
 				{
 					if (i == fenshi_i)
 					{
-						float el_meanline = (float)origin_turnover / ((current_v + interval_v)*grammage);
+						float el_meanline;
+						if (origin_turnover == 0)
+						{
+							el_meanline = pMarketData->PreClosePrice;
+						}
+						else
+						{
+							el_meanline = (float)(origin_turnover / (current_v + interval_v));
+							el_meanline = el_meanline / grammage;
+						}
 						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%f,\"dated\":%d}", origin_el, update_v, el_meanline, endTime);
 					}
 					else
@@ -1126,7 +1155,16 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					//记录值默认 都是LastPrice v默认总成交量 endTime默认行情去秒数时间
 					if (i == fenshi_i)
 					{
-						float el_meanline = (float)turnover / (v*grammage);
+						float el_meanline;
+						if (turnover == 0)
+						{
+							el_meanline = pMarketData->PreClosePrice;
+						}
+						else
+						{
+							el_meanline = (float)(turnover / v);
+							el_meanline = el_meanline / grammage;
+						}
 						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, tempV, el_meanline, endTime);
 					}
 					else
@@ -1204,6 +1242,15 @@ unsigned int __stdcall ThreadFunc(void* pM)
 			//_endthreadex(0);
 			return   0;
 		}
+		printf("redis-获取%s\n", reply->str);
+		reply = (redisReply *)redisCommand(rc, "HGET  %s %s", "ALL_InstrumentID", "IAU100G");
+		if (reply->str == NULL)
+		{
+			//_endthreadex(0);
+			return   0;
+		}
+		printf("redis-获取%s\n", reply->str);
+
 		cJSON *root = cJSON_Parse(reply->str);
 		int  temInterval_v = cJSON_GetObjectItem(root, "VOL")->valueint;
 		int  total_v = cJSON_GetObjectItem(root, "total_VOL")->valueint;
@@ -1323,13 +1370,13 @@ public:
 		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d %H:%M:%S ", ptr);
 		int now = (int)time(NULL);
 		char value[200] = "";
-		sprintf(value, "{\"%sdate\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", prefix, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+		sprintf_s(value, "{\"%sdate\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", prefix, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 		char name[30];
-		sprintf(name, "%sk_tcp_login_Log", prefix);
+		sprintf_s(name, "%sk_tcp_login_Log", prefix);
 		reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", name, now, value);
 		freeReplyObject(reply);
 
-		sprintf(value, "当客户端发出登录请求之后，该方法会被调用，通知客户端登录是否成功{\ntime:%d\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", now, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+		sprintf_s(value, "当客户端发出登录请求之后，该方法会被调用，通知客户端登录是否成功{\ntime:%d\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", now, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 
 		LOG4CPLUS_WARN(myLoger->logger, value);
 
@@ -1383,7 +1430,7 @@ public:
 		//contracts[18] = "u(T+D)_Deli";
 		m_pUserApi->SubMarketData(contracts, 4);
 	}
-	
+
 
 	// 深度行情通知，行情服务器会主动通知客户端
 	void OnRtnDepthMarketData(CQdpFtdcDepthMarketDataField *pMarketData)
@@ -1431,7 +1478,7 @@ public:
 		printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
 		// 客户端需进行错误处理
 		char value[500] = "";
-		sprintf(value, "针对用户请求的出错通知 ErrorCode = [%d], ErrorMsg = [%s]\nRequestID=[%d], Chain=[%d]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+		sprintf_s(value, "针对用户请求的出错通知 ErrorCode = [%d], ErrorMsg = [%s]\nRequestID=[%d], Chain=[%d]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 		LOG4CPLUS_ERROR(myLoger->logger, value);
 
 		// 释放rc资源
@@ -1479,6 +1526,7 @@ bool RunOnce()
 
 int main()
 {
+
 	//创建互斥对象
 	//if(!RunOnce())
 	//{

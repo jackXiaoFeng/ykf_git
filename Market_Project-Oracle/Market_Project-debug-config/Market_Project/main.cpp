@@ -244,7 +244,7 @@ char *printf_Market(CQdpFtdcDepthMarketDataField *pMarketData)
 {
 	// 客户端按需处理返回的数据
 	static char pri[1500] = {0};
-	sprintf(pri,"\n交易日:%s,  结算组代码:%s,  结算编号:%d,\
+	sprintf_s(pri,"\n交易日:%s,  结算组代码:%s,  结算编号:%d,\
             \n合约代码:%s,  最后修改时间:%s,  最后修改毫秒:%d,  交易所代码:%s，\
             \n昨结算:%f,  昨收盘:%f,  昨持仓量:%f,  昨虚实度:%f,\
             \n今开盘:%f,  最高价:%f,  最低价:%f,  今收盘:%f,\
@@ -462,6 +462,92 @@ unsigned int __stdcall ThreadFunc(void* pM)
 
 	printf("oracle行情%s拼接时间：%s--时间戳：%d=\n", InstrumentID, time_hms, market_Updatetimes);
 
+	char str_el[20] = "";
+	sprintf_s(str_el, "%lf", pMarketData->LastPrice);
+
+	//判断
+	if (strlen(str_el) != 0)
+	{
+		char value[2000] = "";
+
+		sprintf_s(value, "{\"TradingDay\":\"%s\",\"SettlementGroupID\":\"%s\",\"SettlementID\":%d,\"InstrumentID\":\"%s\",\"UpdateTime\":\"%s\",\"UpdateMillisec\":%d,\"ExchangeID\":\"%s\",\"PreSettlementPrice\":%lf,\"PreClosePrice\":%lf,\"PreOpenInterest\":%lf,\"PreDelta\":%lf,\"OpenPrice\":%lf,\"HighestPrice\":%lf,\"LowestPrice\":%lf,\"ClosePrice\":%lf,\"UpperLimitPrice\":%lf,\"LowerLimitPrice\":%lf,\"SettlementPrice\":%lf,\"CurrDelta\":%lf,\"LastPrice\":%lf,\"Volume\":%d,\"Turnover\":%lf,\"OpenInterest\":%lf,\"BidPrice1\":%lf,\"BidVolume1\":%d,\"AskPrice1\":%lf,\"AskVolume1\":%d,\"BidPrice2\":%lf,\"BidVolume2\":%d,\"AskPrice2\":%lf,\"AskVolume2\":%d,\"BidPrice3\":%lf,\"BidVolume3\":%d,\"AskPrice3\":%lf,\"AskVolume3\":%d,\"BidPrice4\":%lf,\"BidVolume4\":%d,\"AskPrice4\":%lf,\"AskVolume4\":%d,\"BidPrice5\":%lf,\"BidVolume5\":%d,\"AskPrice5\":%lf,\"AskVolume5\":%d}",
+			pMarketData->TradingDay,
+			pMarketData->SettlementGroupID,
+			pMarketData->SettlementID,
+
+			pMarketData->InstrumentID,
+			pMarketData->UpdateTime,
+			pMarketData->UpdateMillisec,
+			pMarketData->ExchangeID,
+
+			//昨
+			pMarketData->PreSettlementPrice,
+			pMarketData->PreClosePrice,
+			pMarketData->PreOpenInterest,
+			pMarketData->PreDelta,
+
+			//今
+			pMarketData->OpenPrice,
+			pMarketData->HighestPrice,
+			pMarketData->LowestPrice,
+			pMarketData->ClosePrice,
+
+			pMarketData->UpperLimitPrice,
+			pMarketData->LowerLimitPrice,
+			pMarketData->SettlementPrice,
+			pMarketData->CurrDelta,
+
+			//其他
+			pMarketData->LastPrice,
+			pMarketData->Volume,
+			pMarketData->Turnover,
+			pMarketData->OpenInterest,
+
+			//申
+			//一
+			pMarketData->BidPrice1,
+			pMarketData->BidVolume1,
+			pMarketData->AskPrice1,
+			pMarketData->AskVolume1,
+
+			//二
+			pMarketData->BidPrice2,
+			pMarketData->BidVolume2,
+			pMarketData->AskPrice2,
+			pMarketData->AskVolume2,
+
+			//三
+			pMarketData->BidPrice3,
+			pMarketData->BidVolume3,
+			pMarketData->AskPrice3,
+			pMarketData->AskVolume3,
+
+			//四
+			pMarketData->BidPrice4,
+			pMarketData->BidVolume4,
+			pMarketData->AskPrice4,
+			pMarketData->AskVolume4,
+
+			//五
+			pMarketData->BidPrice5,
+			pMarketData->BidVolume5,
+			pMarketData->AskPrice5,
+			pMarketData->AskVolume5
+		);
+
+		reply = (redisReply *)redisCommand(rc, "HMSET ALL_InstrumentID %s %s", InstrumentID, value);
+		//printf("哈希表插入信息：HMSET: %s\n\n", reply->str);
+		if (reply == NULL) {
+
+			LOG4CPLUS_FATAL(myLoger->logger, "HMSET ALL_InstrumentID Failed to execute command");
+		}
+		freeReplyObject(reply);
+	}
+	else
+	{
+		printf("品种：==%s==暂无行情数据，不能插入redis\n\n\n", InstrumentID);
+	}
+
 	//oracle时间戳类型 格式要遵循 yyyy - mm - dd hh : 24mi : ss.ff
 
 	//执行更新 表 语句
@@ -619,97 +705,10 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	else
 	{
 		printf("插入历史数据-%s--失败\n", pMarketData->InstrumentID);
-		char value[200] = "";
-		sprintf(value, "插入历史数据-%s--失败%s\n%s", pMarketData->InstrumentID, sql, printf_Market(pMarketData));
-		LOG4CPLUS_FATAL(myLoger->logger, value);
+		char value1[2000] = "";
+		sprintf_s(value1, "插入历史数据-%s--失败%s\n%s", pMarketData->InstrumentID, sql, printf_Market(pMarketData));
+		LOG4CPLUS_FATAL(myLoger->logger, value1);
 	}
-
-	char str_el[20] = "";
-	sprintf_s(str_el, "%lf", pMarketData->LastPrice);
-
-	//判断
-	if (strlen(str_el) != 0)
-	{
-		char value[2000] = "";
-
-		sprintf(value, "{\"TradingDay\":\"%s\",\"SettlementGroupID\":\"%s\",\"SettlementID\":%d,\"InstrumentID\":\"%s\",\"UpdateTime\":\"%s\",\"UpdateMillisec\":%d,\"ExchangeID\":\"%s\",\"PreSettlementPrice\":%lf,\"PreClosePrice\":%lf,\"PreOpenInterest\":%lf,\"PreDelta\":%lf,\"OpenPrice\":%lf,\"HighestPrice\":%lf,\"LowestPrice\":%lf,\"ClosePrice\":%lf,\"UpperLimitPrice\":%lf,\"LowerLimitPrice\":%lf,\"SettlementPrice\":%lf,\"CurrDelta\":%lf,\"LastPrice\":%lf,\"Volume\":%d,\"Turnover\":%lf,\"OpenInterest\":%lf,\"BidPrice1\":%lf,\"BidVolume1\":%d,\"AskPrice1\":%lf,\"AskVolume1\":%d,\"BidPrice2\":%lf,\"BidVolume2\":%d,\"AskPrice2\":%lf,\"AskVolume2\":%d,\"BidPrice3\":%lf,\"BidVolume3\":%d,\"AskPrice3\":%lf,\"AskVolume3\":%d,\"BidPrice4\":%lf,\"BidVolume4\":%d,\"AskPrice4\":%lf,\"AskVolume4\":%d,\"BidPrice5\":%lf,\"BidVolume5\":%d,\"AskPrice5\":%lf,\"AskVolume5\":%d}",
-			pMarketData->TradingDay,
-			pMarketData->SettlementGroupID,
-			pMarketData->SettlementID,
-
-			pMarketData->InstrumentID,
-			pMarketData->UpdateTime,
-			pMarketData->UpdateMillisec,
-			pMarketData->ExchangeID,
-
-			//昨
-			pMarketData->PreSettlementPrice,
-			pMarketData->PreClosePrice,
-			pMarketData->PreOpenInterest,
-			pMarketData->PreDelta,
-
-			//今
-			pMarketData->OpenPrice,
-			pMarketData->HighestPrice,
-			pMarketData->LowestPrice,
-			pMarketData->ClosePrice,
-
-			pMarketData->UpperLimitPrice,
-			pMarketData->LowerLimitPrice,
-			pMarketData->SettlementPrice,
-			pMarketData->CurrDelta,
-
-			//其他
-			pMarketData->LastPrice,
-			pMarketData->Volume,
-			pMarketData->Turnover,
-			pMarketData->OpenInterest,
-
-			//申
-			//一
-			pMarketData->BidPrice1,
-			pMarketData->BidVolume1,
-			pMarketData->AskPrice1,
-			pMarketData->AskVolume1,
-
-			//二
-			pMarketData->BidPrice2,
-			pMarketData->BidVolume2,
-			pMarketData->AskPrice2,
-			pMarketData->AskVolume2,
-
-			//三
-			pMarketData->BidPrice3,
-			pMarketData->BidVolume3,
-			pMarketData->AskPrice3,
-			pMarketData->AskVolume3,
-
-			//四
-			pMarketData->BidPrice4,
-			pMarketData->BidVolume4,
-			pMarketData->AskPrice4,
-			pMarketData->AskVolume4,
-
-			//五
-			pMarketData->BidPrice5,
-			pMarketData->BidVolume5,
-			pMarketData->AskPrice5,
-			pMarketData->AskVolume5
-		);
-
-		reply = (redisReply *)redisCommand(rc, "HMSET ALL_InstrumentID %s %s", InstrumentID, value);
-		//printf("哈希表插入信息：HMSET: %s\n\n", reply->str);
-		if (reply == NULL) {
-			
-			LOG4CPLUS_FATAL(myLoger->logger, "HMSET ALL_InstrumentID Failed to execute command");
-		}
-		freeReplyObject(reply);
-	}
-	else
-	{
-		printf("品种：==%s==暂无行情数据，不能插入redis\n\n\n", InstrumentID);
-	}
-
 	LeaveCriticalSection(&g_cs);
 	return   0;
 }
@@ -756,7 +755,7 @@ public:
 		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d %H:%M:%S ", ptr);
 		int now = time(NULL);
 		char value[200] = "";
-		sprintf(value, "当客户端发出登录请求之后，该方法会被调用，通知客户端登录是否成功{\ntime:%d\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", now, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+		sprintf_s(value, "当客户端发出登录请求之后，该方法会被调用，通知客户端登录是否成功{\ntime:%d\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", now, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 
 		LOG4CPLUS_WARN(myLoger->logger, value);
 
@@ -765,7 +764,7 @@ public:
 			// 端登失败，客户端需进行错误处理
 			printf("Failed to login, errorcode=%d errormsg=%s requestid=%d chain=%d", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 			char value[500] = "";
-			sprintf(value, "端登失败，客户端需进行错误处理\nFailed to login, errorcode=%d errormsg=%s requestid=%d chain=%d", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+			sprintf_s(value, "端登失败，客户端需进行错误处理\nFailed to login, errorcode=%d errormsg=%s requestid=%d chain=%d", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 			LOG4CPLUS_ERROR(myLoger->logger, value);
 
 			return;
@@ -820,7 +819,7 @@ public:
 		// 客户端需进行错误处理
 
 		char value[500] = "";
-		sprintf(value, "针对用户请求的出错通知 ErrorCode = [%d], ErrorMsg = [%s]\nRequestID=[%d], Chain=[%d]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+		sprintf_s(value, "针对用户请求的出错通知 ErrorCode = [%d], ErrorMsg = [%s]\nRequestID=[%d], Chain=[%d]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 		LOG4CPLUS_ERROR(myLoger->logger, value);
 
 		// 释放rc资源
