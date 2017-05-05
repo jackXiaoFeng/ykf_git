@@ -462,91 +462,99 @@ unsigned int __stdcall ThreadFunc(void* pM)
 
 	printf("oracle行情%s拼接时间：%s--时间戳：%d=\n", InstrumentID, time_hms, market_Updatetimes);
 
-	char str_el[20] = "";
-	sprintf_s(str_el, "%lf", pMarketData->LastPrice);
-
-	//判断
-	if (strlen(str_el) != 0)
+	if (strcmp(InstrumentID, "AGTD") == 0 ||
+		strcmp(InstrumentID, "AUTD") == 0 ||
+		strcmp(InstrumentID, "AU100G") == 0 ||
+		strcmp(InstrumentID, "MAUTD") == 0)
 	{
-		char value[2000] = "";
+		char str_el[20] = "";
+		sprintf_s(str_el, "%lf", pMarketData->LastPrice);
 
-		sprintf_s(value, "{\"TradingDay\":\"%s\",\"SettlementGroupID\":\"%s\",\"SettlementID\":%d,\"InstrumentID\":\"%s\",\"UpdateTime\":\"%s\",\"UpdateMillisec\":%d,\"ExchangeID\":\"%s\",\"PreSettlementPrice\":%lf,\"PreClosePrice\":%lf,\"PreOpenInterest\":%lf,\"PreDelta\":%lf,\"OpenPrice\":%lf,\"HighestPrice\":%lf,\"LowestPrice\":%lf,\"ClosePrice\":%lf,\"UpperLimitPrice\":%lf,\"LowerLimitPrice\":%lf,\"SettlementPrice\":%lf,\"CurrDelta\":%lf,\"LastPrice\":%lf,\"Volume\":%d,\"Turnover\":%lf,\"OpenInterest\":%lf,\"BidPrice1\":%lf,\"BidVolume1\":%d,\"AskPrice1\":%lf,\"AskVolume1\":%d,\"BidPrice2\":%lf,\"BidVolume2\":%d,\"AskPrice2\":%lf,\"AskVolume2\":%d,\"BidPrice3\":%lf,\"BidVolume3\":%d,\"AskPrice3\":%lf,\"AskVolume3\":%d,\"BidPrice4\":%lf,\"BidVolume4\":%d,\"AskPrice4\":%lf,\"AskVolume4\":%d,\"BidPrice5\":%lf,\"BidVolume5\":%d,\"AskPrice5\":%lf,\"AskVolume5\":%d}",
-			pMarketData->TradingDay,
-			pMarketData->SettlementGroupID,
-			pMarketData->SettlementID,
+		//判断
+		if (strlen(str_el) != 0)
+		{
+			char value[2000] = "";
 
-			pMarketData->InstrumentID,
-			pMarketData->UpdateTime,
-			pMarketData->UpdateMillisec,
-			pMarketData->ExchangeID,
+			sprintf_s(value, "{\"TradingDay\":\"%s\",\"SettlementGroupID\":\"%s\",\"SettlementID\":%d,\"InstrumentID\":\"%s\",\"UpdateTime\":\"%s\",\"UpdateMillisec\":%d,\"ExchangeID\":\"%s\",\"PreSettlementPrice\":%lf,\"PreClosePrice\":%lf,\"PreOpenInterest\":%lf,\"PreDelta\":%lf,\"OpenPrice\":%lf,\"HighestPrice\":%lf,\"LowestPrice\":%lf,\"ClosePrice\":%lf,\"UpperLimitPrice\":%lf,\"LowerLimitPrice\":%lf,\"SettlementPrice\":%lf,\"CurrDelta\":%lf,\"LastPrice\":%lf,\"Volume\":%d,\"Turnover\":%lf,\"OpenInterest\":%lf,\"BidPrice1\":%lf,\"BidVolume1\":%d,\"AskPrice1\":%lf,\"AskVolume1\":%d,\"BidPrice2\":%lf,\"BidVolume2\":%d,\"AskPrice2\":%lf,\"AskVolume2\":%d,\"BidPrice3\":%lf,\"BidVolume3\":%d,\"AskPrice3\":%lf,\"AskVolume3\":%d,\"BidPrice4\":%lf,\"BidVolume4\":%d,\"AskPrice4\":%lf,\"AskVolume4\":%d,\"BidPrice5\":%lf,\"BidVolume5\":%d,\"AskPrice5\":%lf,\"AskVolume5\":%d}",
+				pMarketData->TradingDay,
+				pMarketData->SettlementGroupID,
+				pMarketData->SettlementID,
 
-			//昨
-			pMarketData->PreSettlementPrice,
-			pMarketData->PreClosePrice,
-			pMarketData->PreOpenInterest,
-			pMarketData->PreDelta,
+				pMarketData->InstrumentID,
+				pMarketData->UpdateTime,
+				pMarketData->UpdateMillisec,
+				pMarketData->ExchangeID,
 
-			//今
-			pMarketData->OpenPrice,
-			pMarketData->HighestPrice,
-			pMarketData->LowestPrice,
-			pMarketData->ClosePrice,
+				//昨
+				pMarketData->PreSettlementPrice,
+				pMarketData->PreClosePrice,
+				pMarketData->PreOpenInterest,
+				pMarketData->PreDelta,
 
-			pMarketData->UpperLimitPrice,
-			pMarketData->LowerLimitPrice,
-			pMarketData->SettlementPrice,
-			pMarketData->CurrDelta,
+				//今
+				pMarketData->OpenPrice,
+				pMarketData->HighestPrice,
+				pMarketData->LowestPrice,
+				pMarketData->ClosePrice,
 
-			//其他
-			pMarketData->LastPrice,
-			pMarketData->Volume,
-			pMarketData->Turnover,
-			pMarketData->OpenInterest,
+				pMarketData->UpperLimitPrice,
+				pMarketData->LowerLimitPrice,
+				pMarketData->SettlementPrice,
+				pMarketData->CurrDelta,
 
-			//申
-			//一
-			pMarketData->BidPrice1,
-			pMarketData->BidVolume1,
-			pMarketData->AskPrice1,
-			pMarketData->AskVolume1,
+				//其他
+				pMarketData->LastPrice,
+				pMarketData->Volume,
+				pMarketData->Turnover,
+				pMarketData->OpenInterest,
 
-			//二
-			pMarketData->BidPrice2,
-			pMarketData->BidVolume2,
-			pMarketData->AskPrice2,
-			pMarketData->AskVolume2,
+				//申
+				//一
+				pMarketData->BidPrice1,
+				pMarketData->BidVolume1,
+				pMarketData->AskPrice1,
+				pMarketData->AskVolume1,
 
-			//三
-			pMarketData->BidPrice3,
-			pMarketData->BidVolume3,
-			pMarketData->AskPrice3,
-			pMarketData->AskVolume3,
+				//二
+				pMarketData->BidPrice2,
+				pMarketData->BidVolume2,
+				pMarketData->AskPrice2,
+				pMarketData->AskVolume2,
 
-			//四
-			pMarketData->BidPrice4,
-			pMarketData->BidVolume4,
-			pMarketData->AskPrice4,
-			pMarketData->AskVolume4,
+				//三
+				pMarketData->BidPrice3,
+				pMarketData->BidVolume3,
+				pMarketData->AskPrice3,
+				pMarketData->AskVolume3,
 
-			//五
-			pMarketData->BidPrice5,
-			pMarketData->BidVolume5,
-			pMarketData->AskPrice5,
-			pMarketData->AskVolume5
-		);
+				//四
+				pMarketData->BidPrice4,
+				pMarketData->BidVolume4,
+				pMarketData->AskPrice4,
+				pMarketData->AskVolume4,
 
-		reply = (redisReply *)redisCommand(rc, "HMSET ALL_InstrumentID %s %s", InstrumentID, value);
-		//printf("哈希表插入信息：HMSET: %s\n\n", reply->str);
-		if (reply == NULL) {
+				//五
+				pMarketData->BidPrice5,
+				pMarketData->BidVolume5,
+				pMarketData->AskPrice5,
+				pMarketData->AskVolume5
+			);
 
-			LOG4CPLUS_FATAL(myLoger->logger, "HMSET ALL_InstrumentID Failed to execute command");
+			reply = (redisReply *)redisCommand(rc, "HMSET ALL_InstrumentID %s %s", InstrumentID, value);
+			//printf("哈希表插入信息：HMSET: %s\n\n", reply->str);
+			if (reply == NULL) {
+
+				LOG4CPLUS_FATAL(myLoger->logger, "HMSET ALL_InstrumentID Failed to execute command");
+			}
+			freeReplyObject(reply);
 		}
-		freeReplyObject(reply);
+		else
+		{
+			printf("品种：==%s==暂无行情数据，不能插入redis\n\n\n", InstrumentID);
+		}
 	}
-	else
-	{
-		printf("品种：==%s==暂无行情数据，不能插入redis\n\n\n", InstrumentID);
-	}
+
+	
 
 	//oracle时间戳类型 格式要遵循 yyyy - mm - dd hh : 24mi : ss.ff
 
