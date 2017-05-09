@@ -419,6 +419,20 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	//临界区
 	EnterCriticalSection(&g_cs);
 
+	//结算混乱 数据不规范直接退出
+	if (strlen(pMarketData->SettlementGroupID) > 9 ||
+		pMarketData->SettlementID > INT_MAX ||
+		pMarketData->PreSettlementPrice > DBL_MAX ||
+		pMarketData->PreSettlementPrice < 0 ||
+		strlen(pMarketData->UpdateTime) < 1)
+	{
+		printf("数据不规范-失败\n");
+		char value1[2000] = "";
+		sprintf_s(value1, "数据不规范-%s--\n%s", pMarketData->InstrumentID, printf_Market(pMarketData));
+		LOG4CPLUS_FATAL(myLoger->logger, value1);
+		return 0;
+	}
+
 	//输出行情
 	//printf("%s\n", printf_Market(pMarketData));
 

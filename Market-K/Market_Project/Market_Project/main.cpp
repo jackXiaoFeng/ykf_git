@@ -59,6 +59,9 @@ char oracle_Password[50];
 char redis_DomainName[50];
 int  redis_Port;
 
+char charlist[50][50];
+int holidaysNumber;
+
 int MomdayTime;
 int nowDayOfWeek;
 
@@ -374,6 +377,28 @@ void delAndReplace(char *str, char *d, char oldChar, char newChar)
 //	_endthreadex(0);
 //	return   0;
 //}
+
+BOOL isHolidaysFunction(int i,const char charlist[50][50],char *nowDate)
+{
+	BOOL isH = false;
+	int len = i;
+	for (int j = 0; j < len; j++)
+	{
+		const char * a = NULL;
+		if (strcmp(nowDate, charlist[j]) == 0)
+		{
+			isH = true;
+			break;
+		}
+		else
+		{
+			isH = false;
+		}
+	}
+
+	return isH;
+}
+
 //输出行情信息
 void printf_Market(CQdpFtdcDepthMarketDataField *pMarketData)
 {
@@ -477,14 +502,26 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	time_t lt;
 	lt = time(NULL);
 	ptr = localtime(&lt);
-	//fix 1:年月日用本地年月日拼接行情时分秒 因为行情时间晚八点之后日期会变为下一天
-	//本地日期+行情时分秒 用于计算 分钟k
-	strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d", ptr);
+	//如果是双休节假日 则用行情日期
+	int wday = ptr->tm_wday;//今天是本周的第几天。周一=0，周日=6
+	BOOL isHolidays = isHolidaysFunction(holidaysNumber, charlist, nowtDate);
+	if (isHolidays || wday > 4)
+	{
+		strcpy(nowtDate, pMarketData->TradingDay);
+		sprintf_s(nowtDate, "%s-%s-%s", substring(nowtDate, 0, 4), substring(nowtDate, 4, 2), substring(nowtDate, 6, 2));
+	}
+	else
+	{
+		//fix 1:年月日用本地年月日拼接行情时分秒 因为行情时间晚八点之后日期会变为下一天
+		//本地日期+行情时分秒 用于计算 分钟k
+		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d", ptr);
+	}
 	strcpy(market_time_str, nowtDate);
 	strcpy(time_hms, pMarketData->UpdateTime);
 	strcat(market_time_str, " ");
 	strcat(market_time_str, time_hms);
 	int market_Updatetimes = (int)StringToDatetime(market_time_str);
+
 
 	//因行情时间有延迟 故在23:59:59秒 拼接的时候会出现本地日期已经过一天 行情时间还是上一天的bug 所以判断如果行情时间戳大于本地时间戳和大于不只一秒条件 就减去一个交易日  但是日周月k则不必减去直接就给取余数不影响
 	int now = (int)lt;
@@ -511,9 +548,10 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	{
 		r_Market_Updatetimes = market_Updatetimes;
 	}
+
+
 	struct tm *r_ptr;
 	time_t r_lt;
-
 	//9:00-11:30 13:30-15:30 20:00-24:00 00:00-02:00
 	/*#20:00 = 72000,
 	2:30 = 9000,2:31 = 9060,
@@ -747,8 +785,9 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	}
 
 	int endTime = 0;
-	int fenshi_i = 6;//判断分时
-					 //int len = sizeof(nameArray) / sizeof(char*);
+	int fenshi_i = 6;
+	//判断分时
+	//int len = sizeof(nameArray) / sizeof(char*);
 	for (int i = 0; i < 10; ++i)
 	{
 		//设定k线名字和时间间隔
@@ -820,7 +859,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					//_endthreadex(0);
 					return   0;
 				}
-				printf("redis-获取%s\n", reply->str);
+				//printf("redis-获取%s\n", reply->str);
 				cJSON *root = cJSON_Parse(reply->str);
 				double current_maxl;
 				double current_minl;
@@ -1242,14 +1281,6 @@ unsigned int __stdcall ThreadFunc(void* pM)
 			//_endthreadex(0);
 			return   0;
 		}
-		printf("redis-获取%s\n", reply->str);
-		reply = (redisReply *)redisCommand(rc, "HGET  %s %s", "ALL_InstrumentID", "IAU100G");
-		if (reply->str == NULL)
-		{
-			//_endthreadex(0);
-			return   0;
-		}
-		printf("redis-获取%s\n", reply->str);
 
 		cJSON *root = cJSON_Parse(reply->str);
 		int  temInterval_v = cJSON_GetObjectItem(root, "VOL")->valueint;
@@ -1550,6 +1581,8 @@ int main()
 	std::string c_redis_DomainName;
 	int c_redis_Port;
 
+	std::string c_holidays;
+
 	const char ConfigFile[] = "config.txt";
 	Config configSettings(ConfigFile);
 
@@ -1562,6 +1595,8 @@ int main()
 
 	c_redis_DomainName = configSettings.Read("redis_DomainName", c_redis_DomainName);
 	c_redis_Port = configSettings.Read("redis_Port", 0);
+
+	c_holidays = configSettings.Read("holidays", c_holidays);
 
 	std::cout << "marketAddress:" << c_marketAddress << "\n" << std::endl;
 	std::cout << "oracle_DomainName:" << c_oracle_DomainName << std::endl;
@@ -1581,6 +1616,18 @@ int main()
 
 	strcpy(redis_DomainName, c_redis_DomainName.c_str());
 	redis_Port = c_redis_Port;
+
+	char holidays[50];
+	strcpy(holidays, c_holidays.c_str());
+	char seg[] = ","; /*分隔符这里为逗号comma，分隔符可以为你指定的，如分号，空格等*/
+    holidaysNumber = 0;
+	char *substr = strtok(holidays, seg);/*利用现成的分割函数,substr为分割出来的子字符串*/
+	while (substr != NULL) {
+		strcpy(charlist[holidaysNumber], substr);/*把新分割出来的子字符串substr拷贝到要存储的charlsit中*/
+		holidaysNumber ++;
+		substr = strtok(NULL, seg);/*在第一次调用时，strtok()必需给予参数str字符串，
+								   往后的调用则将参数str设置成NULL。每次调用成功则返回被分割出片段的指针。*/
+	}
 
 	//连接redis
 	ConnrectionRedis();

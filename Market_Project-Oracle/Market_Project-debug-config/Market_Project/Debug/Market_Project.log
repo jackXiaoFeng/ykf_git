@@ -1,6 +1,6 @@
 ﻿  main.cpp
   You are not using DLL C run time library. You must call log4cplus::initialize() once before you use any other log4cplus API.
-g:\ykf_git\market_project-oracle\market_project-debug-config\market_project\main.cpp(756): warning C4244: “初始化”: 从“time_t”转换到“int”，可能丢失数据
+g:\ykf_git\market_project-oracle\market_project-debug-config\market_project\main.cpp(779): warning C4244: “初始化”: 从“time_t”转换到“int”，可能丢失数据
 C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(1193,5): warning MSB8030: The linker switch "Minimum Required Version" requires "SubSystem" to be set.  Without "SubSystem", the "Minimum Required Version" would not be passed to linker and could prevent to the output binary from running on older Operating Systems.
   Market_Project.vcxproj -> G:\ykf_git\Market_Project-Oracle\Market_Project-debug-config\Debug\Market_Project.exe
   Market_Project.vcxproj -> G:\ykf_git\Market_Project-Oracle\Market_Project-debug-config\Debug\Market_Project.pdb (Full PDB)

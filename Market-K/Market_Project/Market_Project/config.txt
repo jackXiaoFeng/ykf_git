@@ -1,16 +1,18 @@
-//Market TCP 
+#Market TCP 
 marketAddress = tcp://101.226.241.234:30007
 
-//oracle
+#oracle
 oracle_DomainName = dbd1.yishouhuangjin.com
 oracle_Port = 1521
 oracle_UserID = HQ
 oracle_Password = Abcd1234
 
-//redis
+#redis
 redis_DomainName = redisd.yishouhuangjin.com
 redis_Port = 6379
 
+#2017年 节假日(除去双休日) http://www.sge.com.cn/jjsnotice/5140849
+holidays = 2017-05-01,2017-05-29,2017-05-30,2017-10-02,2017-10-03,2017-10-04,2017-10-05
 
 #设置日志追加到文件尾
 log4cplus.appender.APPNDER_FILE=log4cplus::RollingFileAppender  
