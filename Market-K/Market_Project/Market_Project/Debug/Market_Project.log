@@ -3,10 +3,10 @@
   You are not using DLL C run time library. You must call log4cplus::initialize() once before you use any other log4cplus API.
   main.cpp
   You are not using DLL C run time library. You must call log4cplus::initialize() once before you use any other log4cplus API.
-g:\ykf_git\market-k\market_project\market_project\main.cpp(970): warning C4244: “=”: 从“TQdpFtdcPriceType”转换到“float”，可能丢失数据
-g:\ykf_git\market-k\market_project\market_project\main.cpp(1056): warning C4244: “=”: 从“TQdpFtdcPriceType”转换到“float”，可能丢失数据
-g:\ykf_git\market-k\market_project\market_project\main.cpp(1077): warning C4244: “=”: 从“TQdpFtdcPriceType”转换到“float”，可能丢失数据
-g:\ykf_git\market-k\market_project\market_project\main.cpp(1200): warning C4244: “=”: 从“TQdpFtdcPriceType”转换到“float”，可能丢失数据
+g:\ykf_git\market-k\market_project\market_project\main.cpp(972): warning C4244: “=”: 从“TQdpFtdcPriceType”转换到“float”，可能丢失数据
+g:\ykf_git\market-k\market_project\market_project\main.cpp(1068): warning C4244: “=”: 从“TQdpFtdcPriceType”转换到“float”，可能丢失数据
+g:\ykf_git\market-k\market_project\market_project\main.cpp(1101): warning C4244: “=”: 从“TQdpFtdcPriceType”转换到“float”，可能丢失数据
+g:\ykf_git\market-k\market_project\market_project\main.cpp(1236): warning C4244: “=”: 从“TQdpFtdcPriceType”转换到“float”，可能丢失数据
   DBOperation.cpp
   Confi.cpp
   正在生成代码...

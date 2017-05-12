@@ -190,7 +190,7 @@ int compare_time_60(int time, int time_interval_local, char *marketDate)
 	{
 		if ((nowTimestamp_Surplus >= 9000 && nowTimestamp_Surplus < 9060) ||
 			(nowTimestamp_Surplus >= 41400 && nowTimestamp_Surplus < 41460) ||
-			(nowTimestamp_Surplus >= 55800 && nowTimestamp_Surplus < 55860))
+			(nowTimestamp_Surplus >= 55800 && nowTimestamp_Surplus < 56700))
 		{
 			//特殊收盘时间k线不加间隔
 			endTime_60 = time;
@@ -203,7 +203,7 @@ int compare_time_60(int time, int time_interval_local, char *marketDate)
 		//去除分钟数
 		endTime_60 = endTime_60 - int(endTime_60) % int(time_interval_local);
 
-		if (nowTimestamp_Surplus >= 7200 && nowTimestamp_Surplus < 55860)
+		if (nowTimestamp_Surplus >= 7200 && nowTimestamp_Surplus < 56700)
 		{
 			if (time % (60 * 60) < 1800)
 			{
@@ -229,7 +229,7 @@ int compare_time_240(char *marketDate)
 		sprintf_s(s, "%s %s", marketDate, "10:30:00");
 		endTime_240 = (int)StringToDatetime(s);
 	}
-	else if (nowTimestamp_Surplus >= 37800 && nowTimestamp_Surplus < 55860)
+	else if (nowTimestamp_Surplus >= 37800 && nowTimestamp_Surplus < 56700)
 	{
 		endTime_240 = nowTimestamp_Zero + 55800;
 	}
@@ -249,7 +249,7 @@ int get_time_week(time_t lt, tm *ptr)
 	MomdayTime = 0;
 
 	int wday = ptr->tm_wday;
-	nowDayOfWeek = (wday == 0) ? 7 : wday - 1; //今天是本周的第几天。周一=0，周日=6
+	nowDayOfWeek = (wday == 0) ? 6 : wday - 1; //今天是本周的第几天。周一=0，周日=6
 	int nowTime = (int)lt;
 	/*time_t now;
 	int nowTime = (int)time(&now);
@@ -378,7 +378,7 @@ void delAndReplace(char *str, char *d, char oldChar, char newChar)
 //	return   0;
 //}
 
-BOOL isHolidaysFunction(int i,const char charlist[50][50],char *nowDate)
+BOOL isHolidaysFunction(int i, const char charlist[50][50], char *nowDate)
 {
 	BOOL isH = false;
 	int len = i;
@@ -484,7 +484,6 @@ void printf_Market(CQdpFtdcDepthMarketDataField *pMarketData)
 unsigned int __stdcall ThreadFunc(void* pM)
 {
 	CQdpFtdcDepthMarketDataField *pMarketData = (CQdpFtdcDepthMarketDataField *)pM;
-
 	//临界区
 	EnterCriticalSection(&g_cs);
 
@@ -503,19 +502,11 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	lt = time(NULL);
 	ptr = localtime(&lt);
 	//如果是双休节假日 则用行情日期
-	int wday = ptr->tm_wday;//今天是本周的第几天。周一=0，周日=6
-	BOOL isHolidays = isHolidaysFunction(holidaysNumber, charlist, nowtDate);
-	if (isHolidays || wday > 4)
-	{
-		strcpy(nowtDate, pMarketData->TradingDay);
-		sprintf_s(nowtDate, "%s-%s-%s", substring(nowtDate, 0, 4), substring(nowtDate, 4, 2), substring(nowtDate, 6, 2));
-	}
-	else
-	{
-		//fix 1:年月日用本地年月日拼接行情时分秒 因为行情时间晚八点之后日期会变为下一天
-		//本地日期+行情时分秒 用于计算 分钟k
-		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d", ptr);
-	}
+	int wday = ptr->tm_wday;
+	wday = (wday == 0) ? 6 : wday - 1; //今天是本周的第几天。周一=0，周日=6	  
+	//fix 1:年月日用本地年月日拼接行情时分秒 因为行情时间晚八点之后日期会变为下一天
+	//本地日期+行情时分秒 用于计算 分钟k
+	strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d", ptr);
 	strcpy(market_time_str, nowtDate);
 	strcpy(time_hms, pMarketData->UpdateTime);
 	strcat(market_time_str, " ");
@@ -558,7 +549,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	9:00 = 32400,
 	11:30 = 41400, 11:31=4160
 	13:30 = 48600,
-	15:30 = 55800 15:30 = 55860
+	15:30 = 55800 15:30 = 55860 15:45 = 56700  日周月k结算收盘价在15:45分才结束所以 要增加到15:45分
 	*/
 	//根据行情更新时间来确定是否是在开盘价之内 是否存redis
 	int dds = market_Updatetimes;
@@ -568,9 +559,9 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	//停盘时间加一分钟 是为了结束时30:00减去前一个时间段 算出成交量
 	if ((nowTimestamp_Surplus >= 72000 || nowTimestamp_Surplus < 9060) ||
 		(nowTimestamp_Surplus >= 32400 && nowTimestamp_Surplus < 41460) ||
-		(nowTimestamp_Surplus >= 48600 && nowTimestamp_Surplus < 55860))
+		(nowTimestamp_Surplus >= 48600 && nowTimestamp_Surplus < 56700))
 	{
-		//printf("开盘时间");
+		//printf("开盘时间");56700
 	}
 	else
 	{
@@ -580,11 +571,17 @@ unsigned int __stdcall ThreadFunc(void* pM)
 		return   0;
 	}
 
+	BOOL isHolidays = isHolidaysFunction(holidaysNumber, charlist, nowtDate);
+	if (isHolidays || wday > 5 || (wday == 5 && nowTimestamp_Surplus > 9060))
+	{
+		return 0;
+	}
+
 	//是否是停盘最后一分钟
 	bool isLastMinutes = false;
 	if ((nowTimestamp_Surplus >= 9000 && nowTimestamp_Surplus < 9060) ||
 		(nowTimestamp_Surplus >= 41400 && nowTimestamp_Surplus < 41460) ||
-		(nowTimestamp_Surplus >= 55800 && nowTimestamp_Surplus < 55860))
+		(nowTimestamp_Surplus >= 55800 && nowTimestamp_Surplus < 56700))
 	{
 		//特殊收盘时间k线不加间隔
 		isLastMinutes = true;
@@ -603,9 +600,6 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	char origin_InstrumentID[31] = "";
 	char InstrumentID[30] = "";
 	strcpy(origin_InstrumentID, pMarketData->InstrumentID);
-	/*char d[5] = { '(', ')', '+' };
-	delAndReplace(origin_InstrumentID, d, '.', '_');
-	strcpy(InstrumentID, origin_InstrumentID);*/
 
 
 	//品种克数计算 影响均价  总额除以总手数
@@ -637,6 +631,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	double minl = pMarketData->LowestPrice;
 	double sl = pMarketData->OpenPrice;
 	double el = pMarketData->LastPrice;
+	double closeP = pMarketData->ClosePrice;
 	int v = pMarketData->Volume;
 	double turnover = pMarketData->Turnover;
 
@@ -836,7 +831,14 @@ unsigned int __stdcall ThreadFunc(void* pM)
 		{
 			// 1 5 15 30
 			int local = isLastMinutes ? 0 : time_interval_local;
-			endTime = market_Updatetimes + local;
+			if (nowTimestamp_Surplus > 55860 && nowTimestamp_Surplus < 56700)
+			{
+				endTime = nowTimestamp_Zero + 55800;
+			}
+			else
+			{
+				endTime = market_Updatetimes + local;
+			}
 			endTime = endTime - int(endTime) % int(time_interval_local);
 		}
 
@@ -974,11 +976,16 @@ unsigned int __stdcall ThreadFunc(void* pM)
 							el_meanline = (float)(turnover / v);
 							el_meanline = el_meanline / grammage;
 						}
-						sprintf(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, now_time_v, el_meanline, endTime);
+						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, now_time_v, el_meanline, endTime);
 					}
-					else
+					else if (i == 7 || i == 8 || i == 9)
 					{
-						sprintf(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", el, el, el, el, now_time_v, endTime);
+						closeP = closeP == 0 ? el : closeP;
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", maxl, minl, sl, closeP, now_time_v, endTime);
+					}else	
+					{
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", el, el, el, el, now_time_v, endTime);
+
 					}
 					/*reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, endTime, value);
 					if (NULL == reply)
@@ -997,6 +1004,11 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					if (i == fenshi_i)
 					{
 						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"turnover\":%lf,\"dated\":%d}", el, now_time_v, v, turnover, endTime);
+					}
+					else if (i == 7 || i == 8 || i == 9)
+					{
+						closeP = closeP == 0 ? el : closeP;
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", maxl, minl, sl, closeP, now_time_v, v, endTime);
 					}
 					else
 					{
@@ -1062,6 +1074,18 @@ unsigned int __stdcall ThreadFunc(void* pM)
 						}
 						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%f,\"dated\":%d}", el, update_v, el_meanline, endTime);
 					}
+					else if (i == 7 || i == 8 || i == 9)
+					{
+						closeP = closeP == 0 ? el : closeP;
+						if (i == 7)
+						{
+							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", maxl, minl, sl, closeP, update_v, endTime);
+						}
+						else
+						{
+							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", current_maxl, current_minl, current_sl, closeP, update_v, endTime);
+						}
+					}
 					else
 					{
 						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", current_maxl, current_minl, current_sl, el, update_v, endTime);
@@ -1092,7 +1116,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 				/*reply = (redisReply *)redisCommand(rc, "HMSET %s %d %s", myhash, max_time, value);
 				freeReplyObject(reply);*/
 
-				sprintf_s(value_d, "HMSET %s %d %s", myhash, max_time, value);
+				sprintf_s(value_d, "HMSET %s %d %s", myhash, endTime, value);
 				command3 = value_d;
 				redisAppendCommand(rc, command3);
 
@@ -1102,6 +1126,18 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					if (i == fenshi_i)
 					{
 						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"turnover\":%lf,\"dated\":%d}", el, update_v, interval_v, turnover, endTime);
+					}
+					else if (i == 7 || i == 8 || i == 9)
+					{
+						closeP = closeP == 0 ? el : closeP;
+						if (i == 7)
+						{
+							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", maxl, minl, sl, closeP, update_v, interval_v, endTime);
+						}
+						else
+						{
+							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", current_maxl, current_minl, current_sl, closeP, update_v, interval_v, endTime);
+						}
 					}
 					else
 					{
@@ -1206,6 +1242,11 @@ unsigned int __stdcall ThreadFunc(void* pM)
 						}
 						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"el_meanline\":%lf,\"dated\":%d}", el, tempV, el_meanline, endTime);
 					}
+					else if (i == 7 || i == 8 || i == 9)
+					{
+						closeP = closeP == 0 ? el : closeP;
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", maxl, minl, sl, closeP, tempV, endTime);
+					}
 					else
 					{
 						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", el, el, el, el, tempV, endTime);
@@ -1218,6 +1259,11 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					if (i == fenshi_i)
 					{
 						sprintf_s(value, "{\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"turnover\":%lf,\"dated\":%d}", el, v, v, turnover, endTime);
+					}
+					else if (i == 7 || i == 8 || i == 9)
+					{
+						closeP = closeP == 0 ? el : closeP;
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", maxl, minl, sl, closeP, v, v, endTime);
 					}
 					else
 					{
@@ -1400,7 +1446,7 @@ public:
 		ptr = localtime(&lt);
 		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d %H:%M:%S ", ptr);
 		int now = (int)time(NULL);
-		char value[200] = "";
+		char value[800] = "";
 		sprintf_s(value, "{\"%sdate\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", prefix, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 		char name[30];
 		sprintf_s(name, "%sk_tcp_login_Log", prefix);
@@ -1508,7 +1554,7 @@ public:
 		printf("ErrorCode=[%d], ErrorMsg=[%s]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg);
 		printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
 		// 客户端需进行错误处理
-		char value[500] = "";
+		char value[800] = "";
 		sprintf_s(value, "针对用户请求的出错通知 ErrorCode = [%d], ErrorMsg = [%s]\nRequestID=[%d], Chain=[%d]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 		LOG4CPLUS_ERROR(myLoger->logger, value);
 
@@ -1620,11 +1666,11 @@ int main()
 	char holidays[50];
 	strcpy(holidays, c_holidays.c_str());
 	char seg[] = ","; /*分隔符这里为逗号comma，分隔符可以为你指定的，如分号，空格等*/
-    holidaysNumber = 0;
+	holidaysNumber = 0;
 	char *substr = strtok(holidays, seg);/*利用现成的分割函数,substr为分割出来的子字符串*/
 	while (substr != NULL) {
 		strcpy(charlist[holidaysNumber], substr);/*把新分割出来的子字符串substr拷贝到要存储的charlsit中*/
-		holidaysNumber ++;
+		holidaysNumber++;
 		substr = strtok(NULL, seg);/*在第一次调用时，strtok()必需给予参数str字符串，
 								   往后的调用则将参数str设置成NULL。每次调用成功则返回被分割出片段的指针。*/
 	}

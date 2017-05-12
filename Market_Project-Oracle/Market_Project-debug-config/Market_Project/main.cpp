@@ -313,16 +313,16 @@ char *printf_Market(CQdpFtdcDepthMarketDataField *pMarketData)
 		pMarketData->AskPrice4,
 		pMarketData->AskVolume4,
 
-		//五
-		pMarketData->BidPrice5,
-		pMarketData->BidVolume5,
-		pMarketData->AskPrice5,
-		pMarketData->AskVolume5
-	);
-	return pri;
+//五
+pMarketData->BidPrice5,
+pMarketData->BidVolume5,
+pMarketData->AskPrice5,
+pMarketData->AskVolume5
+);
+return pri;
 
-	//printf(
-	//	"\n<<<<<< \n交易日:%s,  结算组代码:%s,  结算编号:%d,\
+//printf(
+//	"\n<<<<<< \n交易日:%s,  结算组代码:%s,  结算编号:%d,\
  //           \n合约代码:%s,  最后修改时间:%s,  最后修改毫秒:%d,  交易所代码:%s，\
  //           \n昨结算:%f,  昨收盘:%f,  昨持仓量:%f,  昨虚实度:%f,\
  //           \n今开盘:%f,  最高价:%f,  最低价:%f,  今收盘:%f,\
@@ -412,6 +412,20 @@ char *printf_Market(CQdpFtdcDepthMarketDataField *pMarketData)
 	printf("%f \n", pMarketData->BidPrice1);
 	*/
 }
+
+int IncludeChinese(char *str)//返回0：无中文，返回1：有中文
+{
+	char c;
+	while (1)
+	{
+		c = *str++;
+		if (c == 0) break;  //如果到字符串尾则说明该字符串没有中文字符
+		if (c & 0x80)        //如果字符高位为1且下一字符高位也是1则有中文字符
+			if (*str & 0x80) 
+				return 1;
+	}
+	return 0;
+}
 unsigned int __stdcall ThreadFunc(void* pM)
 {
 	CQdpFtdcDepthMarketDataField *pMarketData = (CQdpFtdcDepthMarketDataField *)pM;
@@ -419,22 +433,24 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	//临界区
 	EnterCriticalSection(&g_cs);
 
+	//printf("%s-%d\n", pMarketData->SettlementGroupID, lan);
+
+	//输出行情
+	//printf("%s\n", printf_Market(pMarketData));
 	//结算混乱 数据不规范直接退出
 	if (strlen(pMarketData->SettlementGroupID) > 9 ||
 		pMarketData->SettlementID > INT_MAX ||
+		pMarketData->SettlementID < 0 ||
 		pMarketData->PreSettlementPrice > DBL_MAX ||
 		pMarketData->PreSettlementPrice < 0 ||
 		strlen(pMarketData->UpdateTime) < 1)
 	{
 		printf("数据不规范-失败\n");
-		char value1[2000] = "";
+		char value1[4000] = "";
 		sprintf_s(value1, "数据不规范-%s--\n%s", pMarketData->InstrumentID, printf_Market(pMarketData));
 		LOG4CPLUS_FATAL(myLoger->logger, value1);
 		return 0;
 	}
-
-	//输出行情
-	//printf("%s\n", printf_Market(pMarketData));
 
 	_RecordsetPtr pRst;
 	char sql[1500] = { 0 };
@@ -650,6 +666,17 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	//	printf("更新行情种类---失败\n");
 	//}
 
+	//try
+	//{
+	//	//if (true)    //如果，则抛出异常；  
+	//	//	throw myex;
+	//	int i = 1 / 0;
+	//}
+	//catch (exception& e)
+	//{
+	//	cout << e.what() << endl;
+	//}
+
 	//执行插入历史表语句  
 	sprintf_s(sql, "INSERT INTO %s (TRADINGDAY,SETTLEMENTGROUPID,SETTLEMENTID,INSTRUMENTID,UPDATETIME,UPDATEMILLISEC,EXCHANGEID,PRESETTLEMENTPRICE,PRECLOSEPRICE,PREOPENINTEREST,PREDELTA,OPENPRICE,HIGHESTPRICE,LOWESTPRICE,CLOSEPRICE,UPPERLIMITPRICE,LOWERLIMITPRICE,SETTLEMENTPRICE,CURRDELTA,LASTPRICE,VOLUME,TURNOVER,OPENINTEREST,BIDPRICE1,BIDVOLUME1,ASKPRICE1,ASKVOLUME1,BIDPRICE2,BIDVOLUME2,ASKPRICE2,ASKVOLUME2,BIDPRICE3,BIDVOLUME3,ASKPRICE3,ASKVOLUME3,BIDPRICE4,BIDVOLUME4,ASKPRICE4,ASKVOLUME4,BIDPRICE5,BIDVOLUME5,ASKPRICE5,ASKVOLUME5,DATET,DATED) VALUES ('%s','%s',%d,'%s','%s',%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,to_date('%s','yyyymmddhh24miss'),%d)",
 		InstrumentID,
@@ -727,7 +754,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	else
 	{
 		printf("插入历史数据-%s--失败\n", pMarketData->InstrumentID);
-		char value1[2000] = "";
+		char value1[4000] = "";
 		sprintf_s(value1, "插入历史数据-%s--失败%s\n%s", pMarketData->InstrumentID, sql, printf_Market(pMarketData));
 		LOG4CPLUS_FATAL(myLoger->logger, value1);
 	}
@@ -776,7 +803,7 @@ public:
 		ptr = localtime(&lt);
 		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d %H:%M:%S ", ptr);
 		int now = time(NULL);
-		char value[200] = "";
+		char value[800] = "";
 		sprintf_s(value, "当客户端发出登录请求之后，该方法会被调用，通知客户端登录是否成功{\ntime:%d\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", now, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 
 		LOG4CPLUS_WARN(myLoger->logger, value);
@@ -785,7 +812,7 @@ public:
 		{
 			// 端登失败，客户端需进行错误处理
 			printf("Failed to login, errorcode=%d errormsg=%s requestid=%d chain=%d", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
-			char value[500] = "";
+			char value[800] = "";
 			sprintf_s(value, "端登失败，客户端需进行错误处理\nFailed to login, errorcode=%d errormsg=%s requestid=%d chain=%d", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 			LOG4CPLUS_ERROR(myLoger->logger, value);
 
@@ -840,7 +867,7 @@ public:
 		printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
 		// 客户端需进行错误处理
 
-		char value[500] = "";
+		char value[800] = "";
 		sprintf_s(value, "针对用户请求的出错通知 ErrorCode = [%d], ErrorMsg = [%s]\nRequestID=[%d], Chain=[%d]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 		LOG4CPLUS_ERROR(myLoger->logger, value);
 
@@ -922,8 +949,18 @@ bool RunOnce()
 	*/
 }
 
+//可以自己定义Exception  
+class myexception : public exception
+{
+	virtual const char* what() const throw()
+	{
+		return "My exception happened";
+	}
+}myex;
+
 int main(int   argc, char*   argv[])
 {
+	
 	//创建互斥对象
 	//if(!RunOnce())
 	//{
