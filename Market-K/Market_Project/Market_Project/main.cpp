@@ -504,8 +504,8 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	//如果是双休节假日 则用行情日期
 	int wday = ptr->tm_wday;
 	wday = (wday == 0) ? 6 : wday - 1; //今天是本周的第几天。周一=0，周日=6	  
-	//fix 1:年月日用本地年月日拼接行情时分秒 因为行情时间晚八点之后日期会变为下一天
-	//本地日期+行情时分秒 用于计算 分钟k
+									   //fix 1:年月日用本地年月日拼接行情时分秒 因为行情时间晚八点之后日期会变为下一天
+									   //本地日期+行情时分秒 用于计算 分钟k
 	strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d", ptr);
 	strcpy(market_time_str, nowtDate);
 	strcpy(time_hms, pMarketData->UpdateTime);
@@ -568,12 +568,14 @@ unsigned int __stdcall ThreadFunc(void* pM)
 		//printf("休盘时间\n");
 		//休盘时间 直接跳出回调函数
 		//_endthreadex(0);
+		LeaveCriticalSection(&g_cs);
 		return   0;
 	}
 
 	BOOL isHolidays = isHolidaysFunction(holidaysNumber, charlist, nowtDate);
 	if (isHolidays || wday > 5 || (wday == 5 && nowTimestamp_Surplus > 9060))
 	{
+		LeaveCriticalSection(&g_cs);
 		return 0;
 	}
 
@@ -859,6 +861,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 				{
 					printf("redis-获取%s失败", myhash_v);
 					//_endthreadex(0);
+					LeaveCriticalSection(&g_cs);
 					return   0;
 				}
 				//printf("redis-获取%s\n", reply->str);
@@ -887,6 +890,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 				{
 					el = origin_el;
 				}
+
 
 				if (i == fenshi_i)
 				{
@@ -981,8 +985,10 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					else if (i == 7 || i == 8 || i == 9)
 					{
 						closeP = closeP == 0 ? el : closeP;
-						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", maxl, minl, sl, closeP, now_time_v, endTime);
-					}else	
+						sl = sl == 0 ? el : sl;
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", el, el, sl, closeP, now_time_v, endTime);
+					}
+					else
 					{
 						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", el, el, el, el, now_time_v, endTime);
 
@@ -1008,7 +1014,8 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					else if (i == 7 || i == 8 || i == 9)
 					{
 						closeP = closeP == 0 ? el : closeP;
-						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", maxl, minl, sl, closeP, now_time_v, v, endTime);
+						sl = sl == 0 ? el : sl;
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", el, el, sl, closeP, now_time_v, v, endTime);
 					}
 					else
 					{
@@ -1077,6 +1084,11 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					else if (i == 7 || i == 8 || i == 9)
 					{
 						closeP = closeP == 0 ? el : closeP;
+
+						//防止最小 开盘数据为零
+						minl = minl == 0 ? el : minl;
+						sl = sl == 0 ? el : sl;
+
 						if (i == 7)
 						{
 							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", maxl, minl, sl, closeP, update_v, endTime);
@@ -1130,6 +1142,9 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					else if (i == 7 || i == 8 || i == 9)
 					{
 						closeP = closeP == 0 ? el : closeP;
+						//防止最小 开盘数据为零
+						minl = minl == 0 ? el : minl;
+						sl = sl == 0 ? el : sl;
 						if (i == 7)
 						{
 							sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", maxl, minl, sl, closeP, update_v, interval_v, endTime);
@@ -1245,7 +1260,8 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					else if (i == 7 || i == 8 || i == 9)
 					{
 						closeP = closeP == 0 ? el : closeP;
-						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", maxl, minl, sl, closeP, tempV, endTime);
+						sl = sl == 0 ? el : sl;
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"dated\":%d}", el, el, sl, closeP, tempV, endTime);
 					}
 					else
 					{
@@ -1263,7 +1279,8 @@ unsigned int __stdcall ThreadFunc(void* pM)
 					else if (i == 7 || i == 8 || i == 9)
 					{
 						closeP = closeP == 0 ? el : closeP;
-						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", maxl, minl, sl, closeP, v, v, endTime);
+						sl = sl == 0 ? el : sl;
+						sprintf_s(value, "{\"maxl\":%lf,\"minl\":%lf,\"sl\":%lf,\"el\":%lf,\"v\":%d,\"interval_v\":%d,\"dated\":%d}", el, el, sl, closeP, v, v, endTime);
 					}
 					else
 					{
@@ -1325,6 +1342,7 @@ unsigned int __stdcall ThreadFunc(void* pM)
 		if (reply->str == NULL)
 		{
 			//_endthreadex(0);
+			LeaveCriticalSection(&g_cs);
 			return   0;
 		}
 
@@ -1512,33 +1530,6 @@ public:
 	// 深度行情通知，行情服务器会主动通知客户端
 	void OnRtnDepthMarketData(CQdpFtdcDepthMarketDataField *pMarketData)
 	{
-		//HANDLE   hThread[1];
-		//hThread[0] = (HANDLE)_beginthreadex(NULL, 0, &ThreadFunc, pMarketData, 0, NULL);//&param表示传递参数
-		//ResumeThread(hThread);
-		//WaitForSingleObject(hThread[0], 1000);
-		////int rval = WaitForMultipleObjects(1, hThread, false, INFINITE);
-		////cout << "-" << rval << endl;
-		//CloseHandle(hThread[0]);
-
-		//HANDLE   hth1;
-		//unsigned  uiThread1ID;
-		//hth1 = (HANDLE)_beginthreadex(NULL,         // security  
-		//	0,            // stack size  
-		//	&ThreadFunc,
-		//	pMarketData,           // arg list  
-		//	CREATE_SUSPENDED,  // so we can later call ResumeThread()  
-		//	&uiThread1ID);
-		//if (hth1 == 0)
-		//	printf("Failed to create thread 1\n");
-		////DWORD   dwExitCode;
-		////GetExitCodeThread(hth1, &dwExitCode);  // should be STILL_ACTIVE = 0x00000103 = 259  
-		////printf("initial thread 1 exit code = %u\n", dwExitCode);
-		//ResumeThread(hth1);   // serves the purpose of Jaeschke's t1->Start()  
-		//WaitForSingleObject(hth1, INFINITE);
-		//CloseHandle( hth1 );  
-
-
-
 		HANDLE handle[1];
 		InitializeCriticalSection(&g_cs);   //  
 		handle[0] = (HANDLE)_beginthreadex(NULL, 0, &ThreadFunc, pMarketData, 0, NULL);

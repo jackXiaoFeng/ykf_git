@@ -108,7 +108,9 @@ void ConnrectionRedis()
 void ConnrectionOracle()
 {
 	char str[500];
-	sprintf_s(str, "Provider = OraOLEDB.Oracle.1; User ID = %s; Password = %s; Data Source = (DESCRIPTION = (ADDRESS = (PROTOCOL = TCP)(HOST = %s)(PORT = %d))(CONNECT_DATA = (SERVICE_NAME = ORCL))); Persist Security Info = False", oracle_UserID,oracle_Password, oracle_DomainName,oracle_Port);
+	//sprintf_s(str, "Provider=SQLOLEDB.1;Persist Security Info=False;User ID=sa;Initial Catalog=master;Data Source=wind1.yishouhuangjin.com,1433");
+	//sprintf_s(str, "Provider=SQLOLEDB.1; User ID=sa; Password=Abcd234; Data Source=127.0.0.1,1433; Initial Catalog=master");
+	sprintf_s(str, "Provider = OraOLEDB.Oracle.1; User ID = %s; Password = %s; Data Source = (DESCRIPTION = (ADDRESS = (PROTOCOL = TCP)(HOST = %s)(PORT = %d))(CONNECT_DATA = (SERVICE_NAME = ORCL))); Persist Security Info = False", oracle_UserID, oracle_Password, oracle_DomainName, oracle_Port);
 	bool bConn = dbOper.ConnToDB(str, oracle_UserID, oracle_Password);
 	if (false == bConn)
 	{
@@ -973,7 +975,6 @@ int main(int   argc, char*   argv[])
 
 	char buf[1000];
 	GetCurrentDirectory(1000, buf);  //得到当前工作路径
-
 									 //拼接路径
 	char tmpc1[1000];
 	char tmpc2[] = "/config.txt";
