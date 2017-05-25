@@ -12,7 +12,7 @@
 #include <time.h>
 #include <ctype.h>
 #include <process.h> 
-
+#include <exception>  
 #include <hiredis.h>
 #include <ocilib.h>
 #include "cJSON.h"
@@ -61,9 +61,6 @@ int endTime;
 
 CDBOperation dbOper;
 
-redisContext *rc;
-redisReply *reply;
-
 char   dateTime[100];
 
 //market tcp
@@ -78,31 +75,6 @@ char oracle_Password[50];
 char redis_DomainName[50];
 int  redis_Port;
 
-//连接redis
-void ConnrectionRedis()
-{
-	// 连接Redis
-	rc = redisConnect(redis_DomainName, redis_Port);
-	if (rc == NULL || rc->err) {
-		if (rc) {
-			printf("Connection error: %s\n", rc->errstr);
-			redisFree(rc);
-		}
-		else {
-			printf("Connection error: can't allocate redis context\n");
-		}
-		//exit(1);
-		//return;
-	}
-	else
-	{
-		printf("连接redis成功!\n");
-	}
-	//freeReplyObject(reply);
-
-	// 释放rc资源
-	//redisFree(rc);
-}
 
 //连接Oracle
 void ConnrectionOracle()
@@ -435,331 +407,348 @@ unsigned int __stdcall ThreadFunc(void* pM)
 	//临界区
 	EnterCriticalSection(&g_cs);
 
-	//printf("%s-%d\n", pMarketData->SettlementGroupID, lan);
+	try {
+		//printf("%s-%d\n", pMarketData->SettlementGroupID, lan);
 
-	//输出行情
-	//printf("%s\n", printf_Market(pMarketData));
-	//结算混乱 数据不规范直接退出
-	if (strlen(pMarketData->SettlementGroupID) > 9 ||
-		pMarketData->SettlementID > INT_MAX ||
-		pMarketData->SettlementID < 0 ||
-		pMarketData->PreSettlementPrice > DBL_MAX ||
-		pMarketData->PreSettlementPrice < 0 ||
-		strlen(pMarketData->UpdateTime) < 1)
-	{
-		printf("数据不规范-失败\n");
-		char value1[4000] = "";
-		sprintf_s(value1, "数据不规范-%s--\n%s", pMarketData->InstrumentID, printf_Market(pMarketData));
-		LOG4CPLUS_FATAL(myLoger->logger, value1);
-		return 0;
-	}
-
-	_RecordsetPtr pRst;
-	char sql[1500] = { 0 };
-
-	//行情更新时间为  本地日期年月日 拼接行情时分秒
-	char nowtDate[100] = "";
-	char nowtTime[100] = "";
-	char market_time_str[100] = "";
-	char time_hms[30] = "";
-
-	struct tm *ptr;
-	time_t lt;
-	lt = time(NULL);
-	ptr = localtime(&lt);
-	strftime(nowtTime, sizeof(nowtTime), "%Y%m%d%H%M%S", localtime(&lt));
-
-	//fix 1:年月日用本地年月日拼接行情时分秒 因为行情时间晚八点之后日期会变为下一天
-	strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d", ptr);
-	strcpy(market_time_str, nowtDate);
-	strcpy(time_hms, pMarketData->UpdateTime);
-	strcat(market_time_str, " ");
-	strcat(market_time_str, time_hms);
-	int market_Updatetimes = (int)StringToDatetime(market_time_str);
-
-	//因行情时间有延迟 故在23:59:59秒 拼接的时候会出现本地日期已经过一天 行情时间还是上一天的bug 所以判断如果行情时间戳大于本地时间戳和大于不只一秒条件 就减去一个交易日
-	int now = (int)lt;
-	if (market_Updatetimes > now && (market_Updatetimes - now) > 60)
-	{
-		market_Updatetimes -= 24 * 60 * 60;
-	}
-
-	//合约标示去除多余字符 并转成大写字符
-	char origin_InstrumentID[31] = "";
-	strcpy(origin_InstrumentID, pMarketData->InstrumentID);
-	char InstrumentID[30] = "";
-	char d[5] = { '(', ')', '+' };
-	delAndReplace(origin_InstrumentID, d, '.', '_');
-	strcpy(InstrumentID, origin_InstrumentID);
-
-	printf("oracle行情%s拼接时间：%s--时间戳：%d=\n", InstrumentID, time_hms, market_Updatetimes);
-
-	if (strcmp(InstrumentID, "AGTD") == 0 ||
-		strcmp(InstrumentID, "AUTD") == 0 ||
-		strcmp(InstrumentID, "AU100G") == 0 ||
-		strcmp(InstrumentID, "MAUTD") == 0)
-	{
-		char str_el[20] = "";
-		sprintf_s(str_el, "%lf", pMarketData->LastPrice);
-
-		//判断
-		if (strlen(str_el) != 0)
+		//输出行情
+		//printf("%s\n", printf_Market(pMarketData));
+		//结算混乱 数据不规范直接退出
+		if (strlen(pMarketData->SettlementGroupID) > 9 ||
+			pMarketData->SettlementID > INT_MAX ||
+			pMarketData->SettlementID < 0 ||
+			pMarketData->PreSettlementPrice > DBL_MAX ||
+			pMarketData->PreSettlementPrice < 0 ||
+			strlen(pMarketData->UpdateTime) < 1)
 		{
-			char value[2000] = "";
+			printf("数据不规范-失败\n");
+			char value1[4000] = "";
+			sprintf_s(value1, "数据不规范-%s--\n%s", pMarketData->InstrumentID, printf_Market(pMarketData));
+			LOG4CPLUS_FATAL(myLoger->logger, value1);
+			return 0;
+		}
 
-			sprintf_s(value, "{\"TradingDay\":\"%s\",\"SettlementGroupID\":\"%s\",\"SettlementID\":%d,\"InstrumentID\":\"%s\",\"UpdateTime\":\"%s\",\"UpdateMillisec\":%d,\"ExchangeID\":\"%s\",\"PreSettlementPrice\":%lf,\"PreClosePrice\":%lf,\"PreOpenInterest\":%lf,\"PreDelta\":%lf,\"OpenPrice\":%lf,\"HighestPrice\":%lf,\"LowestPrice\":%lf,\"ClosePrice\":%lf,\"UpperLimitPrice\":%lf,\"LowerLimitPrice\":%lf,\"SettlementPrice\":%lf,\"CurrDelta\":%lf,\"LastPrice\":%lf,\"Volume\":%d,\"Turnover\":%lf,\"OpenInterest\":%lf,\"BidPrice1\":%lf,\"BidVolume1\":%d,\"AskPrice1\":%lf,\"AskVolume1\":%d,\"BidPrice2\":%lf,\"BidVolume2\":%d,\"AskPrice2\":%lf,\"AskVolume2\":%d,\"BidPrice3\":%lf,\"BidVolume3\":%d,\"AskPrice3\":%lf,\"AskVolume3\":%d,\"BidPrice4\":%lf,\"BidVolume4\":%d,\"AskPrice4\":%lf,\"AskVolume4\":%d,\"BidPrice5\":%lf,\"BidVolume5\":%d,\"AskPrice5\":%lf,\"AskVolume5\":%d}",
-				pMarketData->TradingDay,
-				pMarketData->SettlementGroupID,
-				pMarketData->SettlementID,
+		_RecordsetPtr pRst;
+		char sql[1500] = { 0 };
 
-				pMarketData->InstrumentID,
-				pMarketData->UpdateTime,
-				pMarketData->UpdateMillisec,
-				pMarketData->ExchangeID,
+		//行情更新时间为  本地日期年月日 拼接行情时分秒
+		char nowtDate[100] = "";
+		char nowtTime[100] = "";
+		char market_time_str[100] = "";
+		char time_hms[30] = "";
 
-				//昨
-				pMarketData->PreSettlementPrice,
-				pMarketData->PreClosePrice,
-				pMarketData->PreOpenInterest,
-				pMarketData->PreDelta,
+		struct tm *ptr;
+		time_t lt;
+		lt = time(NULL);
+		ptr = localtime(&lt);
+		strftime(nowtTime, sizeof(nowtTime), "%Y%m%d%H%M%S", localtime(&lt));
 
-				//今
-				pMarketData->OpenPrice,
-				pMarketData->HighestPrice,
-				pMarketData->LowestPrice,
-				pMarketData->ClosePrice,
+		//fix 1:年月日用本地年月日拼接行情时分秒 因为行情时间晚八点之后日期会变为下一天
+		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d", ptr);
+		strcpy(market_time_str, nowtDate);
+		strcpy(time_hms, pMarketData->UpdateTime);
+		strcat(market_time_str, " ");
+		strcat(market_time_str, time_hms);
+		int market_Updatetimes = (int)StringToDatetime(market_time_str);
 
-				pMarketData->UpperLimitPrice,
-				pMarketData->LowerLimitPrice,
-				pMarketData->SettlementPrice,
-				pMarketData->CurrDelta,
+		//因行情时间有延迟 故在23:59:59秒 拼接的时候会出现本地日期已经过一天 行情时间还是上一天的bug 所以判断如果行情时间戳大于本地时间戳和大于不只一小时条件 就减去一个交易日
+		int now = (int)lt;
+		if (market_Updatetimes > now && (market_Updatetimes - now) > 3600)
+		{
+			market_Updatetimes -= 24 * 60 * 60;
+		}
 
-				//其他
-				pMarketData->LastPrice,
-				pMarketData->Volume,
-				pMarketData->Turnover,
-				pMarketData->OpenInterest,
+		//合约标示去除多余字符 并转成大写字符
+		char origin_InstrumentID[31] = "";
+		strcpy(origin_InstrumentID, pMarketData->InstrumentID);
+		char InstrumentID[30] = "";
+		char d[5] = { '(', ')', '+' };
+		delAndReplace(origin_InstrumentID, d, '.', '_');
+		strcpy(InstrumentID, origin_InstrumentID);
 
-				//申
-				//一
-				pMarketData->BidPrice1,
-				pMarketData->BidVolume1,
-				pMarketData->AskPrice1,
-				pMarketData->AskVolume1,
+		printf("oracle行情%s拼接时间：%s--时间戳：%d=\n", InstrumentID, time_hms, market_Updatetimes);
 
-				//二
-				pMarketData->BidPrice2,
-				pMarketData->BidVolume2,
-				pMarketData->AskPrice2,
-				pMarketData->AskVolume2,
+		////错误：rc = 0x01128890 {err = 1 errstr = 0x01128894 "由于连接方在一段时间后没有正确答复或连接的主机没有反应，连接尝试失败。" fd = 6 ...}  
+		////重连 redis
+		//if (rc->err == 1)
+		//{
+		//	printf("rc->errstr:%s\n", rc->errstr);
+		//	// 释放rc资源
+		//	redisFree(rc);
+		//	//连接redis
+		//	ConnrectionRedis();
+		//}
 
-				//三
-				pMarketData->BidPrice3,
-				pMarketData->BidVolume3,
-				pMarketData->AskPrice3,
-				pMarketData->AskVolume3,
+		//if (strcmp(InstrumentID, "AGTD") == 0 ||
+		//	strcmp(InstrumentID, "AUTD") == 0 ||
+		//	strcmp(InstrumentID, "AU100G") == 0 ||
+		//	strcmp(InstrumentID, "MAUTD") == 0)
+		//{
+		//	char str_el[20] = "";
+		//	sprintf_s(str_el, "%lf", pMarketData->LastPrice);
 
-				//四
-				pMarketData->BidPrice4,
-				pMarketData->BidVolume4,
-				pMarketData->AskPrice4,
-				pMarketData->AskVolume4,
+		//	//判断
+		//	if (strlen(str_el) != 0)
+		//	{
+		//		char value[2000] = "";
 
-				//五
-				pMarketData->BidPrice5,
-				pMarketData->BidVolume5,
-				pMarketData->AskPrice5,
-				pMarketData->AskVolume5
-			);
+		//		sprintf_s(value, "{\"TradingDay\":\"%s\",\"SettlementGroupID\":\"%s\",\"SettlementID\":%d,\"InstrumentID\":\"%s\",\"UpdateTime\":\"%s\",\"UpdateMillisec\":%d,\"ExchangeID\":\"%s\",\"PreSettlementPrice\":%lf,\"PreClosePrice\":%lf,\"PreOpenInterest\":%lf,\"PreDelta\":%lf,\"OpenPrice\":%lf,\"HighestPrice\":%lf,\"LowestPrice\":%lf,\"ClosePrice\":%lf,\"UpperLimitPrice\":%lf,\"LowerLimitPrice\":%lf,\"SettlementPrice\":%lf,\"CurrDelta\":%lf,\"LastPrice\":%lf,\"Volume\":%d,\"Turnover\":%lf,\"OpenInterest\":%lf,\"BidPrice1\":%lf,\"BidVolume1\":%d,\"AskPrice1\":%lf,\"AskVolume1\":%d,\"BidPrice2\":%lf,\"BidVolume2\":%d,\"AskPrice2\":%lf,\"AskVolume2\":%d,\"BidPrice3\":%lf,\"BidVolume3\":%d,\"AskPrice3\":%lf,\"AskVolume3\":%d,\"BidPrice4\":%lf,\"BidVolume4\":%d,\"AskPrice4\":%lf,\"AskVolume4\":%d,\"BidPrice5\":%lf,\"BidVolume5\":%d,\"AskPrice5\":%lf,\"AskVolume5\":%d}",
+		//			pMarketData->TradingDay,
+		//			pMarketData->SettlementGroupID,
+		//			pMarketData->SettlementID,
 
-			reply = (redisReply *)redisCommand(rc, "HMSET ALL_InstrumentID %s %s", InstrumentID, value);
-			//printf("哈希表插入信息：HMSET: %s\n\n", reply->str);
-			if (reply == NULL) {
+		//			pMarketData->InstrumentID,
+		//			pMarketData->UpdateTime,
+		//			pMarketData->UpdateMillisec,
+		//			pMarketData->ExchangeID,
 
-				LOG4CPLUS_FATAL(myLoger->logger, "HMSET ALL_InstrumentID Failed to execute command");
-			}
-			freeReplyObject(reply);
+		//			//昨
+		//			pMarketData->PreSettlementPrice,
+		//			pMarketData->PreClosePrice,
+		//			pMarketData->PreOpenInterest,
+		//			pMarketData->PreDelta,
+
+		//			//今
+		//			pMarketData->OpenPrice,
+		//			pMarketData->HighestPrice,
+		//			pMarketData->LowestPrice,
+		//			pMarketData->ClosePrice,
+
+		//			pMarketData->UpperLimitPrice,
+		//			pMarketData->LowerLimitPrice,
+		//			pMarketData->SettlementPrice,
+		//			pMarketData->CurrDelta,
+
+		//			//其他
+		//			pMarketData->LastPrice,
+		//			pMarketData->Volume,
+		//			pMarketData->Turnover,
+		//			pMarketData->OpenInterest,
+
+		//			//申
+		//			//一
+		//			pMarketData->BidPrice1,
+		//			pMarketData->BidVolume1,
+		//			pMarketData->AskPrice1,
+		//			pMarketData->AskVolume1,
+
+		//			//二
+		//			pMarketData->BidPrice2,
+		//			pMarketData->BidVolume2,
+		//			pMarketData->AskPrice2,
+		//			pMarketData->AskVolume2,
+
+		//			//三
+		//			pMarketData->BidPrice3,
+		//			pMarketData->BidVolume3,
+		//			pMarketData->AskPrice3,
+		//			pMarketData->AskVolume3,
+
+		//			//四
+		//			pMarketData->BidPrice4,
+		//			pMarketData->BidVolume4,
+		//			pMarketData->AskPrice4,
+		//			pMarketData->AskVolume4,
+
+		//			//五
+		//			pMarketData->BidPrice5,
+		//			pMarketData->BidVolume5,
+		//			pMarketData->AskPrice5,
+		//			pMarketData->AskVolume5
+		//		);
+
+		//		reply = (redisReply *)redisCommand(rc, "HMSET ALL_InstrumentID %s %s", InstrumentID, value);
+		//		//printf("哈希表插入信息：HMSET: %s\n\n", reply->str);
+		//		if (reply == NULL) {
+
+		//			LOG4CPLUS_FATAL(myLoger->logger, "HMSET ALL_InstrumentID Failed to execute command");
+		//		}
+		//		freeReplyObject(reply);
+		//	}
+		//	else
+		//	{
+		//		printf("品种：==%s==暂无行情数据，不能插入redis\n\n\n", InstrumentID);
+		//	}
+		//}
+
+
+
+		//oracle时间戳类型 格式要遵循 yyyy - mm - dd hh : 24mi : ss.ff
+
+		//执行更新 表 语句
+		//sprintf_s(sql, "UPDATE QUOTATION SET TRADINGDAY  = '%s',SETTLEMENTGROUPID = '%s',SETTLEMENTID = %d,UPDATETIME = '%s',UPDATEMILLISEC = %d,EXCHANGEID = '%s',PRESETTLEMENTPRICE = %f,PRECLOSEPRICE = %f,PREOPENINTEREST = %f,PREDELTA = %f,OPENPRICE = %f,HIGHESTPRICE = %f,LOWESTPRICE = %f,CLOSEPRICE = %f, UPPERLIMITPRICE = %f,LOWERLIMITPRICE = %f,SETTLEMENTPRICE = %f,CURRDELTA = %f,LASTPRICE = %f,VOLUME = %d,TURNOVER = %f,OPENINTEREST = %f,BIDPRICE1 = %f,BIDVOLUME1 = %d,ASKPRICE1 = %f,ASKVOLUME1 = %d,BIDPRICE2 = %f,BIDVOLUME2 = %d,ASKPRICE2 = %f,ASKVOLUME2 = %d,BIDPRICE3 = %f,BIDVOLUME3 = %d,ASKPRICE3 = %f,ASKVOLUME3 = %d,BIDPRICE4 = %f,BIDVOLUME4 = %d,ASKPRICE4 = %f,ASKVOLUME4 = %d,BIDPRICE5 = %f,BIDVOLUME5 = %d,ASKPRICE5 = %f,ASKVOLUME5 = %d,DATET = to_date('%s','yyyymmddhh24miss'),DATED = %d WHERE INSTRUMENTID = '%s'",
+		//	pMarketData->TradingDay,
+		//	pMarketData->SettlementGroupID,
+		//	pMarketData->SettlementID,
+
+		//	pMarketData->UpdateTime,
+		//	pMarketData->UpdateMillisec,
+		//	pMarketData->ExchangeID,
+
+		//	//昨
+		//	pMarketData->PreSettlementPrice,
+		//	pMarketData->PreClosePrice,
+		//	pMarketData->PreOpenInterest,
+		//	pMarketData->PreDelta,
+
+		//	//今
+		//	pMarketData->OpenPrice,
+		//	pMarketData->HighestPrice,
+		//	pMarketData->LowestPrice,
+		//	pMarketData->ClosePrice,
+
+		//	pMarketData->UpperLimitPrice,
+		//	pMarketData->LowerLimitPrice,
+		//	pMarketData->SettlementPrice,
+		//	pMarketData->CurrDelta,
+
+		//	//其他
+		//	pMarketData->LastPrice,
+		//	pMarketData->Volume,
+		//	pMarketData->Turnover,
+		//	pMarketData->OpenInterest,
+
+		//	//申
+		//	//一
+		//	pMarketData->BidPrice1,
+		//	pMarketData->BidVolume1,
+		//	pMarketData->AskPrice1,
+		//	pMarketData->AskVolume1,
+
+		//	//二
+		//	pMarketData->BidPrice2,
+		//	pMarketData->BidVolume2,
+		//	pMarketData->AskPrice2,
+		//	pMarketData->AskVolume2,
+
+		//	//三
+		//	pMarketData->BidPrice3,
+		//	pMarketData->BidVolume3,
+		//	pMarketData->AskPrice3,
+		//	pMarketData->AskVolume3,
+
+		//	//四
+		//	pMarketData->BidPrice4,
+		//	pMarketData->BidVolume4,
+		//	pMarketData->AskPrice4,
+		//	pMarketData->AskVolume4,
+
+		//	//五
+		//	pMarketData->BidPrice5,
+		//	pMarketData->BidVolume5,
+		//	pMarketData->AskPrice5,
+		//	pMarketData->AskVolume5,
+		//	nowtTime,
+		//	market_Updatetimes,
+
+		//	pMarketData->InstrumentID
+		//);
+		//pRst = dbOper.ExecuteWithResSQL(sql);
+		//if (NULL != pRst)
+		//{
+		//	//printf("更新行情种类-%s---成功\n", pMarketData->InstrumentID);
+		//}
+		//else
+		//{
+		//	printf("更新行情种类---失败\n");
+		//}
+
+		//try
+		//{
+		//	//if (true)    //如果，则抛出异常；  
+		//	//	throw myex;
+		//	int i = 1 / 0;
+		//}
+		//catch (exception& e)
+		//{
+		//	cout << e.what() << endl;
+		//}
+
+		//执行插入历史表语句  
+		sprintf_s(sql, "INSERT INTO %s (TRADINGDAY,SETTLEMENTGROUPID,SETTLEMENTID,INSTRUMENTID,UPDATETIME,UPDATEMILLISEC,EXCHANGEID,PRESETTLEMENTPRICE,PRECLOSEPRICE,PREOPENINTEREST,PREDELTA,OPENPRICE,HIGHESTPRICE,LOWESTPRICE,CLOSEPRICE,UPPERLIMITPRICE,LOWERLIMITPRICE,SETTLEMENTPRICE,CURRDELTA,LASTPRICE,VOLUME,TURNOVER,OPENINTEREST,BIDPRICE1,BIDVOLUME1,ASKPRICE1,ASKVOLUME1,BIDPRICE2,BIDVOLUME2,ASKPRICE2,ASKVOLUME2,BIDPRICE3,BIDVOLUME3,ASKPRICE3,ASKVOLUME3,BIDPRICE4,BIDVOLUME4,ASKPRICE4,ASKVOLUME4,BIDPRICE5,BIDVOLUME5,ASKPRICE5,ASKVOLUME5,DATET,DATED) VALUES ('%s','%s',%d,'%s','%s',%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,to_date('%s','yyyymmddhh24miss'),%d)",
+			InstrumentID,
+			//交易
+			pMarketData->TradingDay,
+			pMarketData->SettlementGroupID,
+			pMarketData->SettlementID,
+
+			pMarketData->InstrumentID,
+			pMarketData->UpdateTime,
+			pMarketData->UpdateMillisec,
+			pMarketData->ExchangeID,
+
+			//昨
+			pMarketData->PreSettlementPrice,
+			pMarketData->PreClosePrice,
+			pMarketData->PreOpenInterest,
+			pMarketData->PreDelta,
+
+			//今
+			pMarketData->OpenPrice,
+			pMarketData->HighestPrice,
+			pMarketData->LowestPrice,
+			pMarketData->ClosePrice,
+
+			pMarketData->UpperLimitPrice,
+			pMarketData->LowerLimitPrice,
+			pMarketData->SettlementPrice,
+			pMarketData->CurrDelta,
+
+			//其他
+			pMarketData->LastPrice,
+			pMarketData->Volume,
+			pMarketData->Turnover,
+			pMarketData->OpenInterest,
+
+			//申
+			//一
+			pMarketData->BidPrice1,
+			pMarketData->BidVolume1,
+			pMarketData->AskPrice1,
+			pMarketData->AskVolume1,
+
+			//二
+			pMarketData->BidPrice2,
+			pMarketData->BidVolume2,
+			pMarketData->AskPrice2,
+			pMarketData->AskVolume2,
+
+			//三
+			pMarketData->BidPrice3,
+			pMarketData->BidVolume3,
+			pMarketData->AskPrice3,
+			pMarketData->AskVolume3,
+
+			//四
+			pMarketData->BidPrice4,
+			pMarketData->BidVolume4,
+			pMarketData->AskPrice4,
+			pMarketData->AskVolume4,
+
+			//五
+			pMarketData->BidPrice5,
+			pMarketData->BidVolume5,
+			pMarketData->AskPrice5,
+			pMarketData->AskVolume5,
+			nowtTime,
+			market_Updatetimes
+		);
+		pRst = dbOper.ExecuteWithResSQL(sql);
+		if (NULL != pRst)
+		{
+			//printf("插入历史数据--%s-成功\n", pMarketData->InstrumentID);
 		}
 		else
 		{
-			printf("品种：==%s==暂无行情数据，不能插入redis\n\n\n", InstrumentID);
+			printf("插入历史数据-%s--失败\n", pMarketData->InstrumentID);
+			char value1[4000] = "";
+			sprintf_s(value1, "插入历史数据-%s--失败%s\n%s", pMarketData->InstrumentID, sql, printf_Market(pMarketData));
+			LOG4CPLUS_FATAL(myLoger->logger, value1);
 		}
 	}
-
-	
-
-	//oracle时间戳类型 格式要遵循 yyyy - mm - dd hh : 24mi : ss.ff
-
-	//执行更新 表 语句
-	//sprintf_s(sql, "UPDATE QUOTATION SET TRADINGDAY  = '%s',SETTLEMENTGROUPID = '%s',SETTLEMENTID = %d,UPDATETIME = '%s',UPDATEMILLISEC = %d,EXCHANGEID = '%s',PRESETTLEMENTPRICE = %f,PRECLOSEPRICE = %f,PREOPENINTEREST = %f,PREDELTA = %f,OPENPRICE = %f,HIGHESTPRICE = %f,LOWESTPRICE = %f,CLOSEPRICE = %f, UPPERLIMITPRICE = %f,LOWERLIMITPRICE = %f,SETTLEMENTPRICE = %f,CURRDELTA = %f,LASTPRICE = %f,VOLUME = %d,TURNOVER = %f,OPENINTEREST = %f,BIDPRICE1 = %f,BIDVOLUME1 = %d,ASKPRICE1 = %f,ASKVOLUME1 = %d,BIDPRICE2 = %f,BIDVOLUME2 = %d,ASKPRICE2 = %f,ASKVOLUME2 = %d,BIDPRICE3 = %f,BIDVOLUME3 = %d,ASKPRICE3 = %f,ASKVOLUME3 = %d,BIDPRICE4 = %f,BIDVOLUME4 = %d,ASKPRICE4 = %f,ASKVOLUME4 = %d,BIDPRICE5 = %f,BIDVOLUME5 = %d,ASKPRICE5 = %f,ASKVOLUME5 = %d,DATET = to_date('%s','yyyymmddhh24miss'),DATED = %d WHERE INSTRUMENTID = '%s'",
-	//	pMarketData->TradingDay,
-	//	pMarketData->SettlementGroupID,
-	//	pMarketData->SettlementID,
-
-	//	pMarketData->UpdateTime,
-	//	pMarketData->UpdateMillisec,
-	//	pMarketData->ExchangeID,
-
-	//	//昨
-	//	pMarketData->PreSettlementPrice,
-	//	pMarketData->PreClosePrice,
-	//	pMarketData->PreOpenInterest,
-	//	pMarketData->PreDelta,
-
-	//	//今
-	//	pMarketData->OpenPrice,
-	//	pMarketData->HighestPrice,
-	//	pMarketData->LowestPrice,
-	//	pMarketData->ClosePrice,
-
-	//	pMarketData->UpperLimitPrice,
-	//	pMarketData->LowerLimitPrice,
-	//	pMarketData->SettlementPrice,
-	//	pMarketData->CurrDelta,
-
-	//	//其他
-	//	pMarketData->LastPrice,
-	//	pMarketData->Volume,
-	//	pMarketData->Turnover,
-	//	pMarketData->OpenInterest,
-
-	//	//申
-	//	//一
-	//	pMarketData->BidPrice1,
-	//	pMarketData->BidVolume1,
-	//	pMarketData->AskPrice1,
-	//	pMarketData->AskVolume1,
-
-	//	//二
-	//	pMarketData->BidPrice2,
-	//	pMarketData->BidVolume2,
-	//	pMarketData->AskPrice2,
-	//	pMarketData->AskVolume2,
-
-	//	//三
-	//	pMarketData->BidPrice3,
-	//	pMarketData->BidVolume3,
-	//	pMarketData->AskPrice3,
-	//	pMarketData->AskVolume3,
-
-	//	//四
-	//	pMarketData->BidPrice4,
-	//	pMarketData->BidVolume4,
-	//	pMarketData->AskPrice4,
-	//	pMarketData->AskVolume4,
-
-	//	//五
-	//	pMarketData->BidPrice5,
-	//	pMarketData->BidVolume5,
-	//	pMarketData->AskPrice5,
-	//	pMarketData->AskVolume5,
-	//	nowtTime,
-	//	market_Updatetimes,
-
-	//	pMarketData->InstrumentID
-	//);
-	//pRst = dbOper.ExecuteWithResSQL(sql);
-	//if (NULL != pRst)
-	//{
-	//	//printf("更新行情种类-%s---成功\n", pMarketData->InstrumentID);
-	//}
-	//else
-	//{
-	//	printf("更新行情种类---失败\n");
-	//}
-
-	//try
-	//{
-	//	//if (true)    //如果，则抛出异常；  
-	//	//	throw myex;
-	//	int i = 1 / 0;
-	//}
-	//catch (exception& e)
-	//{
-	//	cout << e.what() << endl;
-	//}
-
-	//执行插入历史表语句  
-	sprintf_s(sql, "INSERT INTO %s (TRADINGDAY,SETTLEMENTGROUPID,SETTLEMENTID,INSTRUMENTID,UPDATETIME,UPDATEMILLISEC,EXCHANGEID,PRESETTLEMENTPRICE,PRECLOSEPRICE,PREOPENINTEREST,PREDELTA,OPENPRICE,HIGHESTPRICE,LOWESTPRICE,CLOSEPRICE,UPPERLIMITPRICE,LOWERLIMITPRICE,SETTLEMENTPRICE,CURRDELTA,LASTPRICE,VOLUME,TURNOVER,OPENINTEREST,BIDPRICE1,BIDVOLUME1,ASKPRICE1,ASKVOLUME1,BIDPRICE2,BIDVOLUME2,ASKPRICE2,ASKVOLUME2,BIDPRICE3,BIDVOLUME3,ASKPRICE3,ASKVOLUME3,BIDPRICE4,BIDVOLUME4,ASKPRICE4,ASKVOLUME4,BIDPRICE5,BIDVOLUME5,ASKPRICE5,ASKVOLUME5,DATET,DATED) VALUES ('%s','%s',%d,'%s','%s',%d,'%s',%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,to_date('%s','yyyymmddhh24miss'),%d)",
-		InstrumentID,
-		//交易
-		pMarketData->TradingDay,
-		pMarketData->SettlementGroupID,
-		pMarketData->SettlementID,
-
-		pMarketData->InstrumentID,
-		pMarketData->UpdateTime,
-		pMarketData->UpdateMillisec,
-		pMarketData->ExchangeID,
-
-		//昨
-		pMarketData->PreSettlementPrice,
-		pMarketData->PreClosePrice,
-		pMarketData->PreOpenInterest,
-		pMarketData->PreDelta,
-
-		//今
-		pMarketData->OpenPrice,
-		pMarketData->HighestPrice,
-		pMarketData->LowestPrice,
-		pMarketData->ClosePrice,
-
-		pMarketData->UpperLimitPrice,
-		pMarketData->LowerLimitPrice,
-		pMarketData->SettlementPrice,
-		pMarketData->CurrDelta,
-
-		//其他
-		pMarketData->LastPrice,
-		pMarketData->Volume,
-		pMarketData->Turnover,
-		pMarketData->OpenInterest,
-
-		//申
-		//一
-		pMarketData->BidPrice1,
-		pMarketData->BidVolume1,
-		pMarketData->AskPrice1,
-		pMarketData->AskVolume1,
-
-		//二
-		pMarketData->BidPrice2,
-		pMarketData->BidVolume2,
-		pMarketData->AskPrice2,
-		pMarketData->AskVolume2,
-
-		//三
-		pMarketData->BidPrice3,
-		pMarketData->BidVolume3,
-		pMarketData->AskPrice3,
-		pMarketData->AskVolume3,
-
-		//四
-		pMarketData->BidPrice4,
-		pMarketData->BidVolume4,
-		pMarketData->AskPrice4,
-		pMarketData->AskVolume4,
-
-		//五
-		pMarketData->BidPrice5,
-		pMarketData->BidVolume5,
-		pMarketData->AskPrice5,
-		pMarketData->AskVolume5,
-		nowtTime,
-		market_Updatetimes
-	);
-	pRst = dbOper.ExecuteWithResSQL(sql);
-	if (NULL != pRst)
-	{
-		//printf("插入历史数据--%s-成功\n", pMarketData->InstrumentID);
+	catch (exception &e) {  //exception类位于<exception>头文件中
+		cout << "插入oracle出现异常----\n\n\n" << endl;
 	}
-	else
-	{
-		printf("插入历史数据-%s--失败\n", pMarketData->InstrumentID);
-		char value1[4000] = "";
-		sprintf_s(value1, "插入历史数据-%s--失败%s\n%s", pMarketData->InstrumentID, sql, printf_Market(pMarketData));
-		LOG4CPLUS_FATAL(myLoger->logger, value1);
-	}
+
 	LeaveCriticalSection(&g_cs);
 	return   0;
 }
@@ -798,28 +787,36 @@ public:
 		printf("ErrorCode=[%d], ErrorMsg=[%s]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg);
 		printf("RequestID=[%d], Chain=[%d]\n", nRequestID, bIsLast);
 
-		//登录日志
-		char nowtDate[100] = "";
-		struct tm *ptr;
-		time_t lt = time(NULL);
-		ptr = localtime(&lt);
-		strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d %H:%M:%S ", ptr);
-		int now = time(NULL);
-		char value[800] = "";
-		sprintf_s(value, "当客户端发出登录请求之后，该方法会被调用，通知客户端登录是否成功{\ntime:%d\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", now, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
-
-		LOG4CPLUS_WARN(myLoger->logger, value);
-
-		if (pRspInfo->ErrorID != 0)
+		try
 		{
-			// 端登失败，客户端需进行错误处理
-			printf("Failed to login, errorcode=%d errormsg=%s requestid=%d chain=%d", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+			//登录日志
+			char nowtDate[100] = "";
+			struct tm *ptr;
+			time_t lt = time(NULL);
+			ptr = localtime(&lt);
+			strftime(nowtDate, sizeof(nowtDate), "%Y-%m-%d %H:%M:%S ", ptr);
+			int now = time(NULL);
 			char value[800] = "";
-			sprintf_s(value, "端登失败，客户端需进行错误处理\nFailed to login, errorcode=%d errormsg=%s requestid=%d chain=%d", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
-			LOG4CPLUS_ERROR(myLoger->logger, value);
+			sprintf_s(value, "当客户端发出登录请求之后，该方法会被调用，通知客户端登录是否成功{\ntime:%d\"date\":%s,\"ErrorCode\":%d,\"ErrorMsg\":%s,\"RequestID\":%d,\"Chain\":%d}", now, nowtDate, pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 
-			return;
+			LOG4CPLUS_WARN(myLoger->logger, value);
+
+			if (pRspInfo->ErrorID != 0)
+			{
+				// 端登失败，客户端需进行错误处理
+				printf("Failed to login, errorcode=%d errormsg=%s requestid=%d chain=%d", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+				char value[800] = "";
+				sprintf_s(value, "端登失败，客户端需进行错误处理\nFailed to login, errorcode=%d errormsg=%s requestid=%d chain=%d", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
+				LOG4CPLUS_ERROR(myLoger->logger, value);
+
+				return;
+			}
 		}
+		catch (exception &e)
+		{
+			cout << "登录日志异常----\n\n\n" << endl;
+		}
+		
 		char * contracts[19] = { "","","" ,"" ,"","","","","","","","","","","","","","","" };
 		contracts[0] = "g(T+D)_deil";
 		contracts[1] = "Au(T+D)";
@@ -873,11 +870,6 @@ public:
 		sprintf_s(value, "针对用户请求的出错通知 ErrorCode = [%d], ErrorMsg = [%s]\nRequestID=[%d], Chain=[%d]\n", pRspInfo->ErrorID, pRspInfo->ErrorMsg, nRequestID, bIsLast);
 		LOG4CPLUS_ERROR(myLoger->logger, value);
 
-		// 释放rc资源
-		redisFree(rc);
-		freeReplyObject(reply);
-
-		ConnrectionRedis();
 	}
 
 	///订阅合约的相关信息
@@ -961,8 +953,8 @@ class myexception : public exception
 }myex;
 
 int main(int   argc, char*   argv[])
-{
-	
+{	
+
 	//创建互斥对象
 	//if(!RunOnce())
 	//{
@@ -1055,7 +1047,7 @@ int main(int   argc, char*   argv[])
 
 	ConnrectionOracle();
 
-	ConnrectionRedis();
+	//ConnrectionRedis();
 
 	// 产生一个CQdpFtdcMduserApi实例
 	CQdpFtdcMduserApi *pUserApi = CQdpFtdcMduserApi::CreateFtdcMduserApi();
